@@ -48,11 +48,7 @@ export function Footer() {
                   Create Memory Space
                 </Link>
               </li>
-              <li>
-                <Link href="/memory/MEM-RH-2026-8294" className="hover:text-amber-300 transition-colors">
-                  Sample Memory Profile
-                </Link>
-              </li>
+              
             </ul>
           </div>
 

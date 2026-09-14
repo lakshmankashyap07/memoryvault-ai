@@ -133,12 +133,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Demo credentials hint */}
-        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 text-center">
-          <p className="font-semibold">Quick Demo Login:</p>
-          <p className="text-[11px] text-amber-800">Email: <code className="font-mono">demo@memoryvault.com</code> | Password: <code className="font-mono">demo123</code></p>
-        </div>
-
+      
         <div className="pt-4 border-t border-vault-100 text-center text-xs text-vault-600">
           Don&apos;t have an account yet?{' '}
           <Link href="/register" className="font-semibold text-amber-800 hover:underline">

@@ -29,7 +29,7 @@ export default function LandingPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left Column Text */}
-          <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
+          <div className="lg:col-span-12 space-y-6 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-100/80 border border-amber-300/60 text-amber-900 text-xs font-semibold shadow-xs">
               <Heart className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
               <span>&ldquo;Some people leave the place, never the memories.&rdquo;</span>
@@ -78,88 +78,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Right Column Preview Card */}
-          <div className="lg:col-span-6">
-            <div className="relative mx-auto max-w-md lg:max-w-none">
-              {/* Decorative Card Stack Effect */}
-              <div className="absolute -inset-2 bg-gradient-to-r from-amber-500 to-vault-700 rounded-3xl blur-xl opacity-20 transform -rotate-1"></div>
-
-              <div className="relative bg-white rounded-3xl p-6 sm:p-7 shadow-elevated border border-vault-200/80 space-y-6">
-                {/* Card Header */}
-                <div className="flex items-center justify-between pb-4 border-b border-vault-100">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80"
-                      alt="Rahul Verma"
-                      className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-300 shadow-sm"
-                    />
-                    <div>
-                      <h3 className="font-serif font-bold text-xl text-vault-900 flex items-center gap-1.5">
-                        Rahul & College Memories
-                      </h3>
-                      <p className="text-xs text-amber-700 font-semibold">Best Friend • 2019 - 2026</p>
-                    </div>
-                  </div>
-
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-vault-100 text-vault-800 font-mono text-xs font-bold border border-vault-200">
-                    <QrCode className="w-3.5 h-3.5 text-amber-600" />
-                    MEM-RH-2026-8294
-                  </span>
-                </div>
-
-                {/* Photo Collage Preview */}
-                <div className="grid grid-cols-3 gap-2.5">
-                  <div className="relative group overflow-hidden rounded-xl aspect-square">
-                    <img
-                      src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=400&q=80"
-                      alt="Campus Canteen"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <div className="relative group overflow-hidden rounded-xl aspect-square">
-                    <img
-                      src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=400&q=80"
-                      alt="Late Night Hackathon"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <div className="relative group overflow-hidden rounded-xl aspect-square">
-                    <img
-                      src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=400&q=80"
-                      alt="Graduation"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                </div>
-
-                {/* Story Note snippet */}
-                <div className="p-4 rounded-2xl bg-vault-50 border border-vault-200 space-y-1">
-                  <p className="text-xs font-semibold text-vault-900 flex items-center justify-between">
-                    <span>💌 Note from Aditya</span>
-                    <span className="text-[10px] text-vault-400 font-normal">Sep 2026</span>
-                  </p>
-                  <p className="font-serif italic text-xs text-vault-700 line-clamp-2">
-                    &ldquo;From sitting on the back bench in Signals & Systems to building our first startup prototype together...&rdquo;
-                  </p>
-                </div>
-
-                {/* Live Stats Pill */}
-                <div className="flex items-center justify-between pt-2 text-xs font-semibold text-vault-600 border-t border-vault-100">
-                  <span>📸 42 Photos</span>
-                  <span>🎥 8 Videos</span>
-                  <span>💌 17 Messages</span>
-                  <span>🕰️ 12 Events</span>
-                </div>
-
-                <Link
-                  href="/memory/MEM-RH-2026-8294"
-                  className="block text-center py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-semibold text-xs transition-colors"
-                >
-                  Click to Explore Demo Space →
-                </Link>
-              </div>
-            </div>
-          </div>
+         
+         
         </div>
       </section>
 
