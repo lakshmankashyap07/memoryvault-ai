@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import { X, Download, Copy, Check, QrCode, Share2, Sparkles } from 'lucide-react';
+import { getAppUrl } from '@/lib/utils';
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -17,9 +18,7 @@ export function QRCodeModal({ isOpen, onClose, memoryId, personName }: QRCodeMod
   const [copiedId, setCopiedId] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const memoryUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/memory/${memoryId}`
-    : `http://localhost:3000/memory/${memoryId}`;
+  const memoryUrl = `${getAppUrl()}/memory/${memoryId}`;
 
   useEffect(() => {
     if (isOpen && memoryId) {

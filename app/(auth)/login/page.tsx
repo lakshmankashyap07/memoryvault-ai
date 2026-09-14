@@ -1,19 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Heart, Lock, Mail, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Heart, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get('redirect');
+  const emailParam = searchParams.get('email');
+
+  const [email, setEmail] = useState(emailParam || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, [emailParam]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +42,8 @@ export default function LoginPage() {
         throw new Error(data.error || 'Failed to log in');
       }
 
-      router.push('/dashboard');
+      const targetRedirect = redirectParam || '/dashboard';
+      router.push(targetRedirect);
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
@@ -51,7 +62,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-3xl p-8 sm:p-10 max-w-md w-full shadow-elevated border border-vault-200 space-y-6 relative overflow-hidden">
-        {/* Top ambient accent */}
         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-vault-800 via-amber-600 to-vault-600"></div>
 
         <div className="text-center space-y-2">
@@ -66,6 +76,12 @@ export default function LoginPage() {
           <p className="text-xs text-vault-600 font-sans">
             Log in to manage your digital memory spaces
           </p>
+
+          {redirectParam && redirectParam.includes('/invite/') && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
+              Please log in with the invited email address to continue to your invitation.
+            </div>
+          )}
         </div>
 
         {error && (
@@ -133,10 +149,12 @@ export default function LoginPage() {
           </button>
         </form>
 
-      
         <div className="pt-4 border-t border-vault-100 text-center text-xs text-vault-600">
           Don&apos;t have an account yet?{' '}
-          <Link href="/register" className="font-semibold text-amber-800 hover:underline">
+          <Link
+            href={redirectParam ? `/register?redirect=${encodeURIComponent(redirectParam)}` : '/register'}
+            className="font-semibold text-amber-800 hover:underline"
+          >
             Create an Account
           </Link>
         </div>
@@ -198,5 +216,13 @@ export default function LoginPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[80vh] flex items-center justify-center text-xs text-vault-600">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

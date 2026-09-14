@@ -1,17 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Heart, Lock, Mail, User, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get('redirect');
+  const emailParam = searchParams.get('email');
+
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(emailParam || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, [emailParam]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +40,8 @@ export default function RegisterPage() {
         throw new Error(data.error || 'Failed to create account');
       }
 
-      router.push('/dashboard');
+      const targetRedirect = redirectParam || '/dashboard';
+      router.push(targetRedirect);
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'An error occurred during registration');
@@ -56,6 +67,12 @@ export default function RegisterPage() {
           <p className="text-xs text-vault-600 font-sans">
             Start preserving the moments and people that matter most
           </p>
+
+          {redirectParam && redirectParam.includes('/invite/') && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
+              Create an account using the invited email address to continue to your invitation.
+            </div>
+          )}
         </div>
 
         {error && (
@@ -132,11 +149,22 @@ export default function RegisterPage() {
 
         <div className="pt-4 border-t border-vault-100 text-center text-xs text-vault-600">
           Already have an account?{' '}
-          <Link href="/login" className="font-semibold text-amber-800 hover:underline">
+          <Link
+            href={redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : '/login'}
+            className="font-semibold text-amber-800 hover:underline"
+          >
             Sign In Here
           </Link>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[85vh] flex items-center justify-center text-xs text-vault-600">Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }

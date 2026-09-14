@@ -46,3 +46,28 @@ export function getAvatarBg(name: string): string {
   const index = Math.abs(hash) % colors.length;
   return colors[index];
 }
+
+export function getAppUrl(): string {
+  let url = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!url && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    url = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  } else if (!url && process.env.VERCEL_URL) {
+    url = `https://${process.env.VERCEL_URL}`;
+  }
+
+  if (!url) {
+    url = 'http://localhost:3000';
+  }
+
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+
+  return url.replace(/\/+$/, '');
+}
+
+export function getInvitationUrl(token: string): string {
+  return `${getAppUrl()}/invite/${token}`;
+}
+

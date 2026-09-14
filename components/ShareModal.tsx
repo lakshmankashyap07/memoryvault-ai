@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Copy, Check, QrCode, Share2, MessageCircle, Mail, Twitter } from 'lucide-react';
+import { getAppUrl } from '@/lib/utils';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -16,9 +17,7 @@ export function ShareModal({ isOpen, onClose, onOpenQR, memoryId, personName }: 
 
   if (!isOpen) return null;
 
-  const memoryUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/memory/${memoryId}`
-    : `http://localhost:3000/memory/${memoryId}`;
+  const memoryUrl = `${getAppUrl()}/memory/${memoryId}`;
 
   const shareText = `Explore memories of ${personName} on MemoryVault: "Some people leave the place, never the memories."`;
 
