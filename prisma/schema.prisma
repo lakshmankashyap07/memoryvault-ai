@@ -1,0 +1,238 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(cuid())
+  name         String
+  email        String         @unique
+  password     String
+  profileImage String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  ownedSpaces    MemorySpace[]   @relation("OwnerSpaces")
+  contributions  Contributor[]
+  messages       MemoryMessage[]
+  conversations  AIConversation[]
+}
+
+model MemorySpace {
+  id               String          @id @default(cuid())
+  memoryId         String          @unique
+  ownerId          String
+  personName       String
+  nickname         String?
+  profileImage     String?
+  relationship     String          // Friend, Best Friend, Family, Partner, Classmate, Colleague, Mentor, Other
+  description      String?
+  birthday         String?
+  firstMeetingDate String?
+  specialDate      String?
+  phone            String?
+  email            String?
+  instagram        String?
+  linkedin         String?
+  socialLinks      String?         // JSON string for additional links
+  privacy          String          @default("PRIVATE") // PRIVATE, UNLISTED, PUBLIC
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  owner            User            @relation("OwnerSpaces", fields: [ownerId], references: [id], onDelete: Cascade)
+  photos           MemoryPhoto[]
+  videos           MemoryVideo[]
+  messages         MemoryMessage[]
+  timelineEvents   TimelineEvent[]
+  contributors     Contributor[]
+  invitations      Invitation[]
+
+  // Phase 2 AI Relations
+  embeddings       MemoryEmbedding[]
+  analyses         AIAnalysis[]
+  conversations    AIConversation[]
+  tags             MemoryTag[]
+  stories          MemoryStory[]
+  aiSettings       AISettings?
+}
+
+model MemoryPhoto {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  uploadedBy    String
+  fileUrl       String
+  caption       String?
+  date          String?
+  location      String?
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
+
+model MemoryVideo {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  uploadedBy    String
+  fileUrl       String
+  thumbnailUrl  String?
+  title         String?
+  caption       String?
+  date          String?
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
+
+model MemoryMessage {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  authorId      String?
+  authorName    String
+  authorAvatar  String?
+  title         String?
+  message       String
+  photoUrl      String?
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+  author        User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+}
+
+model TimelineEvent {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  title         String
+  description   String?
+  date          String      // e.g. "2019-09-01" or "2019"
+  mediaUrl      String?
+  mediaType     String?     // PHOTO, VIDEO
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
+
+model Contributor {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  userId        String
+  role          String      @default("CONTRIBUTOR") // OWNER, CONTRIBUTOR, VIEWER
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([memorySpaceId, userId])
+}
+
+model Invitation {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  email         String
+  role          String      @default("CONTRIBUTOR") // CONTRIBUTOR, VIEWER
+  token         String      @unique
+  status        String      @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
+
+// ----------------------------------------------------
+// PHASE 2 AI MODELS
+// ----------------------------------------------------
+
+model MemoryEmbedding {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  memoryType    String      // PHOTO, VIDEO, MESSAGE, TIMELINE, GENERAL
+  memoryId      String
+  content       String      // Formatted text snippet used for vector indexing
+  embedding     String      // JSON string of floating point embedding vector
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+
+  @@index([memorySpaceId])
+  @@index([memoryType, memoryId])
+}
+
+model AIAnalysis {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  memoryId      String
+  type          String      // PHOTO_DESC, VIDEO_SUMMARY, TAG_SUGGESTION
+  result        String      // JSON string of analysis results
+  model         String      @default("grounded-local-v1")
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
+
+model AIConversation {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  userId        String
+  title         String      @default("Memory Assistant Chat")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      AIMessage[]
+}
+
+model AIMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  role           String         // user, assistant
+  content        String
+  sources        String?        // JSON string of cited memory sources
+  createdAt      DateTime       @default(now())
+
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model MemoryTag {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  memoryId      String?
+  tag           String
+  source        String      @default("AI") // AI, USER
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+
+  @@unique([memorySpaceId, tag, memoryId])
+}
+
+model MemoryStory {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  title         String
+  length        String      // SHORT, MEDIUM, LONG
+  chapters      String      // JSON string of story chapters
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
+
+model AISettings {
+  id                 String      @id @default(cuid())
+  memorySpaceId      String      @unique
+  enableSearch       Boolean     @default(true)
+  enableDescriptions Boolean     @default(true)
+  enableTimeline     Boolean     @default(true)
+  enableStory        Boolean     @default(true)
+  enableAssistant    Boolean     @default(true)
+  updatedAt          DateTime    @updatedAt
+
+  memorySpace        MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
