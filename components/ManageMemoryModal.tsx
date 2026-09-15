@@ -140,7 +140,7 @@ export function ManageMemoryModal({
   // 5. DELETION CONFIRMATION STATE
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [itemToDelete, setItemToDelete] = useState<{
-    type: 'photo' | 'video' | 'timeline' | 'contributor' | 'invitation' | 'space';
+    type: 'photo' | 'video' | 'file' | 'timeline' | 'contributor' | 'invitation' | 'space';
     id: string;
     title: string;
   } | null>(null);
@@ -313,6 +313,10 @@ export function ManageMemoryModal({
         const res = await fetch(`/api/memories/${space.memoryId}/videos/${itemToDelete.id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete video');
         setSuccess('Video deleted successfully.');
+      } else if (itemToDelete.type === 'file') {
+        const res = await fetch(`/api/memories/${space.memoryId}/files/${itemToDelete.id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete file');
+        setSuccess('File deleted successfully.');
       } else if (itemToDelete.type === 'timeline') {
         const res = await fetch(`/api/memories/${space.memoryId}/timeline/${itemToDelete.id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete timeline event');

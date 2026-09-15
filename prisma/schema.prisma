@@ -50,6 +50,7 @@ model MemorySpace {
   photos           MemoryPhoto[]
   videos           MemoryVideo[]
   messages         MemoryMessage[]
+  files            MemoryFile[]
   timelineEvents   TimelineEvent[]
   contributors     Contributor[]
   invitations      Invitation[]
@@ -236,3 +237,19 @@ model AISettings {
 
   memorySpace        MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
 }
+
+model MemoryFile {
+  id            String      @id @default(cuid())
+  memorySpaceId String
+  uploadedBy    String
+  fileUrl       String
+  fileName      String
+  fileTitle     String?
+  description   String?
+  mimeType      String?
+  fileSize      Int?        // Size in bytes
+  createdAt     DateTime    @default(now())
+
+  memorySpace   MemorySpace @relation(fields: [memorySpaceId], references: [id], onDelete: Cascade)
+}
+

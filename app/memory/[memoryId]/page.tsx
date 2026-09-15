@@ -36,12 +36,19 @@ import {
   MoreVertical,
   Edit3,
   Trash2,
+  FileSpreadsheet,
+  FileArchive,
+  FileCode,
+  ExternalLink,
+  Download,
 } from 'lucide-react';
 
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { ShareModal } from '@/components/ShareModal';
 import { UploadPhotoModal } from '@/components/UploadPhotoModal';
 import { UploadVideoModal } from '@/components/UploadVideoModal';
+import { UploadFileModal } from '@/components/UploadFileModal';
+import { EditFileModal } from '@/components/EditFileModal';
 import { AddMessageModal } from '@/components/AddMessageModal';
 import { AddTimelineModal } from '@/components/AddTimelineModal';
 import { InviteContributorModal } from '@/components/InviteContributorModal';
@@ -106,6 +113,17 @@ interface MemorySpaceData {
     photoUrl?: string | null;
     createdAt: string;
   }>;
+  files: Array<{
+    id: string;
+    fileName: string;
+    fileTitle?: string | null;
+    description?: string | null;
+    mimeType?: string | null;
+    fileSize?: number | null;
+    fileUrl: string;
+    uploadedBy: string;
+    createdAt: string;
+  }>;
   timelineEvents: Array<{
     id: string;
     title: string;
@@ -139,6 +157,9 @@ export default function MemoryProfilePage() {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [fileModalOpen, setFileModalOpen] = useState(false);
+  const [editingFile, setEditingFile] = useState<MemorySpaceData['files'][0] | null>(null);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [timelineModalOpen, setTimelineModalOpen] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -174,6 +195,28 @@ export default function MemoryProfilePage() {
       fetchSpace();
     }
   }, [memoryId]);
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!space) return;
+    if (!confirm('Are you sure you want to delete this file memory? This will permanently remove the file from storage and database.')) {
+      return;
+    }
+    try {
+      setDeletingFileId(fileId);
+      const res = await fetch(`/api/memories/${space.memoryId}/files/${fileId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete file');
+      }
+      await fetchSpace();
+    } catch (err: any) {
+      alert(err.message || 'Error deleting file');
+    } finally {
+      setDeletingFileId(null);
+    }
+  };
 
   const handleBuildTimelineAI = async () => {
     if (!space) return;
@@ -452,6 +495,13 @@ export default function MemoryProfilePage() {
                     <MessageSquare className="w-3.5 h-3.5" />
                     + Message
                   </button>
+                  <button
+                    onClick={() => setFileModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-vault-800 hover:bg-vault-700 text-amber-300 font-semibold text-xs border border-vault-700 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    + File
+                  </button>
                 </div>
               </div>
             )}
@@ -470,7 +520,7 @@ export default function MemoryProfilePage() {
               { id: 'messages', label: `Messages (${space.messages.length})`, icon: MessageSquare },
               { id: 'timeline', label: `Timeline (${space.timelineEvents.length})`, icon: Clock },
               { id: 'contacts', label: 'Contacts', icon: Phone },
-              { id: 'files', label: 'Files', icon: FileText },
+              { id: 'files', label: `Files (${space.files?.length || 0})`, icon: FileText },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -977,16 +1027,143 @@ export default function MemoryProfilePage() {
 
         {/* FILES TAB */}
         {activeTab === 'files' && (
-          <div className="space-y-6 animate-fadeIn max-w-2xl mx-auto">
-            <div className="text-center space-y-1">
-              <h2 className="font-serif text-2xl font-bold text-vault-950">Memory Documents & Attachments</h2>
-              <p className="text-xs text-vault-600">Preserved letters, PDFs, and diploma copies</p>
+          <div className="space-y-6 animate-fadeIn max-w-4xl mx-auto">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h2 className="font-serif text-2xl font-bold text-vault-950">Memory Documents & Attachments</h2>
+                <p className="text-xs text-vault-600">Preserved letters, PDFs, certificates, and important files</p>
+              </div>
+              {canEdit && (
+                <button
+                  onClick={() => setFileModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vault-900 hover:bg-vault-950 text-amber-300 font-bold text-xs shadow-sm transition-all"
+                >
+                  <FileText className="w-4 h-4 text-amber-300" />
+                  + Upload File
+                </button>
+              )}
             </div>
 
-            <div className="bg-white rounded-3xl p-8 border border-vault-200 text-center space-y-3 shadow-xs">
-              <FileText className="w-8 h-8 text-vault-400 mx-auto" />
-              <p className="text-xs text-vault-600">No additional file attachments uploaded yet.</p>
-            </div>
+            {(!space.files || space.files.length === 0) ? (
+              <div className="bg-white rounded-3xl p-12 border border-vault-200 text-center space-y-4 shadow-xs">
+                <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-800 flex items-center justify-center mx-auto border border-amber-200">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-serif font-bold text-lg text-vault-900">No Preserved Documents Yet</h3>
+                  <p className="text-xs text-vault-600 max-w-sm mx-auto">
+                    Upload graduation certificates, letters, tickets, spreadsheets, or archives to preserve them in this Memory Space.
+                  </p>
+                </div>
+                {canEdit && (
+                  <button
+                    onClick={() => setFileModalOpen(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-vault-950 font-bold text-xs shadow-md transition-all"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    Upload First Document
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {space.files.map((item) => {
+                  const ext = item.fileName.split('.').pop()?.toUpperCase() || 'FILE';
+                  const formattedSize = item.fileSize ? (item.fileSize > 1024 * 1024 ? `${(item.fileSize / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(item.fileSize / 1024)} KB`) : null;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white rounded-3xl p-5 border border-vault-200 shadow-soft hover:shadow-md transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group"
+                    >
+                      <div className="flex items-start gap-4 min-w-0">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 border border-amber-300 flex items-center justify-center shrink-0 font-bold text-xs">
+                          <FileText className="w-6 h-6 text-amber-800" />
+                        </div>
+
+                        <div className="space-y-1 min-w-0">
+                          <h4 className="font-serif font-bold text-base text-vault-950 group-hover:text-amber-800 transition-colors truncate">
+                            {item.fileTitle || item.fileName}
+                          </h4>
+
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-vault-500 font-medium">
+                            <span className="px-2 py-0.5 rounded-md bg-vault-100 text-vault-800 font-mono font-semibold">
+                              {ext}
+                            </span>
+                            {formattedSize && (
+                              <>
+                                <span>•</span>
+                                <span>{formattedSize}</span>
+                              </>
+                            )}
+                            <span>•</span>
+                            <span>{formatDate(item.createdAt)}</span>
+                            <span>•</span>
+                            <span>Uploaded by {item.uploadedBy}</span>
+                          </div>
+
+                          {item.description && (
+                            <p className="text-xs text-vault-600 italic bg-vault-50/80 px-3 py-1.5 rounded-xl border border-vault-100 mt-2 max-w-xl">
+                              &ldquo;{item.description}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-2 sm:pt-0">
+                        <a
+                          href={item.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-vault-100 hover:bg-vault-200 text-vault-900 text-xs font-semibold transition-colors"
+                          title="Open or Preview File"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-vault-600" />
+                          <span>Open</span>
+                        </a>
+
+                        <a
+                          href={item.fileUrl}
+                          download={item.fileName}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-vault-950 text-xs font-bold shadow-xs transition-colors"
+                          title="Download File"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download</span>
+                        </a>
+
+                        {canEdit && (
+                          <>
+                            <button
+                              onClick={() => setEditingFile(item)}
+                              className="p-2 rounded-xl hover:bg-vault-100 text-vault-600 hover:text-vault-900 transition-colors"
+                              title="Edit File Title & Description"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteFile(item.id)}
+                              disabled={deletingFileId === item.id}
+                              className="p-2 rounded-xl hover:bg-rose-50 text-vault-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                              title="Delete File Memory"
+                            >
+                              {deletingFileId === item.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -1041,6 +1218,21 @@ export default function MemoryProfilePage() {
         onClose={() => setVideoModalOpen(false)}
         memoryId={space.memoryId}
         onVideoUploaded={fetchSpace}
+      />
+
+      <UploadFileModal
+        isOpen={fileModalOpen}
+        onClose={() => setFileModalOpen(false)}
+        memoryId={space.memoryId}
+        onFileUploaded={fetchSpace}
+      />
+
+      <EditFileModal
+        isOpen={!!editingFile}
+        onClose={() => setEditingFile(null)}
+        memoryId={space.memoryId}
+        file={editingFile}
+        onFileUpdated={fetchSpace}
       />
 
       <AddMessageModal

@@ -31,6 +31,9 @@ export async function GET(
         messages: {
           orderBy: { createdAt: 'desc' },
         },
+        files: {
+          orderBy: { createdAt: 'desc' },
+        },
         timelineEvents: {
           orderBy: { date: 'asc' },
         },
@@ -170,6 +173,7 @@ export async function DELETE(
       include: {
         photos: true,
         videos: true,
+        files: true,
       },
     });
 
@@ -181,7 +185,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden: Only the space owner can delete this memory.' }, { status: 403 });
     }
 
-    // Storage file cleanup for photos & videos
+    // Storage file cleanup for photos, videos, & files
     for (const photo of space.photos) {
       if (photo.fileUrl) {
         await storageProvider.deleteFile(photo.fileUrl);
@@ -190,6 +194,11 @@ export async function DELETE(
     for (const video of space.videos) {
       if (video.fileUrl) {
         await storageProvider.deleteFile(video.fileUrl);
+      }
+    }
+    for (const fileItem of space.files) {
+      if (fileItem.fileUrl) {
+        await storageProvider.deleteFile(fileItem.fileUrl);
       }
     }
 
