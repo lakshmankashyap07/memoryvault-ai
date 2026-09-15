@@ -53,6 +53,7 @@ import { AddMessageModal } from '@/components/AddMessageModal';
 import { AddTimelineModal } from '@/components/AddTimelineModal';
 import { InviteContributorModal } from '@/components/InviteContributorModal';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
+import { VideoLightbox } from '@/components/VideoLightbox';
 import { AIChatDrawer } from '@/components/AIChatDrawer';
 import { AISearchBar } from '@/components/AISearchBar';
 import { AIMemoryHighlights } from '@/components/AIMemoryHighlights';
@@ -60,7 +61,7 @@ import { AITagManager } from '@/components/AITagManager';
 import { RelatedMemories } from '@/components/RelatedMemories';
 import { AISettingsModal } from '@/components/AISettingsModal';
 import { ManageMemoryModal } from '@/components/ManageMemoryModal';
-import { formatDate } from '@/lib/utils';
+import { formatDate, downloadMediaFile } from '@/lib/utils';
 
 interface MemorySpaceData {
   id: string;
@@ -173,6 +174,19 @@ export default function MemoryProfilePage() {
 
   // Lightbox state
   const [selectedPhoto, setSelectedPhoto] = useState<MemorySpaceData['photos'][0] | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<MemorySpaceData['videos'][0] | null>(null);
+  const [downloadingMediaId, setDownloadingMediaId] = useState<string | null>(null);
+
+  const handleDownloadMedia = async (fileUrl: string, defaultFileName: string, mediaId: string) => {
+    try {
+      setDownloadingMediaId(mediaId);
+      await downloadMediaFile(fileUrl, defaultFileName);
+    } catch (err) {
+      console.error('Failed to download media:', err);
+    } finally {
+      setDownloadingMediaId(null);
+    }
+  };
 
   const fetchSpace = async () => {
     try {
@@ -661,8 +675,8 @@ export default function MemoryProfilePage() {
               </div>
 
               {space.photos.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {space.photos.slice(0, 4).map((photo) => (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {space.photos.slice(0, 6).map((photo) => (
                     <div
                       key={photo.id}
                       onClick={() => setSelectedPhoto(photo)}
@@ -671,9 +685,10 @@ export default function MemoryProfilePage() {
                       <img
                         src={photo.fileUrl}
                         alt={photo.caption || 'Memory Photo'}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-vault-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end text-white text-xs">
+                      <div className="absolute inset-0 bg-gradient-to-t from-vault-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-end text-white text-xs">
                         <p className="font-serif line-clamp-1">{photo.caption || 'View Photo'}</p>
                         <p className="text-[10px] text-vault-300">{photo.uploadedBy}</p>
                       </div>
@@ -744,12 +759,12 @@ export default function MemoryProfilePage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-serif text-2xl font-bold text-vault-950">Photo Gallery</h2>
-                <p className="text-xs text-vault-600">Click any photo to view story, metadata & related memories</p>
+                <p className="text-xs text-vault-600">6 photos per row gallery with instant original photo download</p>
               </div>
               {canEdit && (
                 <button
                   onClick={() => setPhotoModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vault-900 text-amber-100 font-semibold text-xs shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vault-900 hover:bg-vault-950 text-amber-100 font-semibold text-xs shadow-sm transition-colors"
                 >
                   <Camera className="w-4 h-4 text-amber-300" />
                   + Add Photo
@@ -761,35 +776,89 @@ export default function MemoryProfilePage() {
               <div className="bg-white rounded-3xl p-12 text-center border border-vault-200 space-y-3">
                 <Camera className="w-8 h-8 text-vault-400 mx-auto" />
                 <p className="text-xs text-vault-600">No photos in this space yet.</p>
+                {canEdit && (
+                  <button
+                    onClick={() => setPhotoModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-vault-900 text-amber-100 text-xs font-semibold"
+                  >
+                    + Add First Photo
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {space.photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    onClick={() => setSelectedPhoto(photo)}
-                    className="bg-white rounded-2xl overflow-hidden border border-vault-200/80 shadow-soft hover:shadow-elevated transition-all group cursor-pointer"
-                  >
-                    <div className="relative aspect-4/3 bg-vault-100 overflow-hidden">
-                      <img
-                        src={photo.fileUrl}
-                        alt={photo.caption || 'Memory Photo'}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <div className="p-4 space-y-2">
-                      {photo.caption && (
-                        <p className="font-serif text-xs text-vault-800 line-clamp-2 leading-relaxed">
-                          &ldquo;{photo.caption}&rdquo;
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between text-[11px] text-vault-500 pt-1 border-t border-vault-100">
-                        <span>{photo.uploadedBy}</span>
-                        <span>{photo.date || formatDate(photo.createdAt)}</span>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                {space.photos.map((photo) => {
+                  const isDownloading = downloadingMediaId === photo.id;
+                  const fileName = photo.caption || `photo-${photo.id.slice(0, 6)}.jpg`;
+
+                  return (
+                    <div
+                      key={photo.id}
+                      onClick={() => setSelectedPhoto(photo)}
+                      className="group relative bg-white rounded-2xl overflow-hidden border border-vault-200/80 shadow-xs hover:shadow-md transition-all flex flex-col cursor-pointer"
+                    >
+                      <div className="relative aspect-square bg-vault-950 overflow-hidden">
+                        <img
+                          src={photo.fileUrl}
+                          alt={photo.caption || 'Memory Photo'}
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-vault-950/90 via-vault-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-between">
+                          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadMedia(photo.fileUrl, fileName, photo.id)}
+                              disabled={isDownloading}
+                              className="p-1.5 rounded-xl bg-vault-900/80 hover:bg-amber-600 text-amber-300 hover:text-vault-950 transition-colors shadow-sm"
+                              title="Download photo"
+                            >
+                              {isDownloading ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+
+                          <div>
+                            {photo.caption && (
+                              <p className="font-serif text-[11px] text-vault-100 line-clamp-1 leading-snug">
+                                &ldquo;{photo.caption}&rdquo;
+                              </p>
+                            )}
+                            <p className="text-[9px] text-vault-300 truncate mt-0.5">
+                              {photo.uploadedBy}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mobile Footer */}
+                      <div className="p-2 bg-white flex items-center justify-between gap-1 text-[10px] text-vault-600 border-t border-vault-100 sm:hidden">
+                        <span className="truncate font-medium">{photo.caption || 'Photo'}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadMedia(photo.fileUrl, fileName, photo.id);
+                          }}
+                          disabled={isDownloading}
+                          className="p-1 rounded-lg bg-vault-100 hover:bg-amber-100 text-vault-800 shrink-0"
+                          title="Download"
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-amber-800" />
+                          ) : (
+                            <Download className="w-3 h-3 text-vault-700" />
+                          )}
+                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -800,13 +869,13 @@ export default function MemoryProfilePage() {
           <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-serif text-2xl font-bold text-vault-950">Video Memories</h2>
-                <p className="text-xs text-vault-600">Lazy-loaded video clips & audio moments</p>
+                <h2 className="font-serif text-2xl font-bold text-vault-950">Video Gallery</h2>
+                <p className="text-xs text-vault-600">6 videos per row gallery with play indicator & download support</p>
               </div>
               {canEdit && (
                 <button
                   onClick={() => setVideoModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vault-900 text-amber-100 font-semibold text-xs shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vault-900 hover:bg-vault-950 text-amber-100 font-semibold text-xs shadow-sm transition-colors"
                 >
                   <Video className="w-4 h-4 text-amber-300" />
                   + Add Video
@@ -818,37 +887,100 @@ export default function MemoryProfilePage() {
               <div className="bg-white rounded-3xl p-12 text-center border border-vault-200 space-y-3">
                 <Video className="w-8 h-8 text-vault-400 mx-auto" />
                 <p className="text-xs text-vault-600">No videos uploaded yet.</p>
+                {canEdit && (
+                  <button
+                    onClick={() => setVideoModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-vault-900 text-amber-100 text-xs font-semibold"
+                  >
+                    + Add First Video
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {space.videos.map((video) => (
-                  <div key={video.id} className="bg-white rounded-3xl overflow-hidden border border-vault-200 shadow-soft space-y-3 p-4">
-                    <div className="relative rounded-2xl overflow-hidden bg-black aspect-video">
-                      <video
-                        controls
-                        preload="none"
-                        poster={video.thumbnailUrl || undefined}
-                        className="w-full h-full object-contain"
-                      >
-                        <source src={video.fileUrl} type="video/mp4" />
-                        Your browser does not support video play.
-                      </video>
-                    </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                {space.videos.map((video) => {
+                  const isDownloading = downloadingMediaId === video.id;
+                  const fileName = video.title || video.caption || `video-${video.id.slice(0, 6)}.mp4`;
 
-                    <div className="space-y-1">
-                      {video.title && (
-                        <h4 className="font-serif font-bold text-base text-vault-900">{video.title}</h4>
-                      )}
-                      {video.caption && (
-                        <p className="text-xs text-vault-600 leading-relaxed font-serif italic">&ldquo;{video.caption}&rdquo;</p>
-                      )}
-                      <div className="flex items-center justify-between text-[11px] text-vault-500 pt-2 border-t border-vault-100">
-                        <span>Shared by {video.uploadedBy}</span>
-                        <span>{video.date || formatDate(video.createdAt)}</span>
+                  return (
+                    <div
+                      key={video.id}
+                      onClick={() => setSelectedVideo(video)}
+                      className="group relative bg-white rounded-2xl overflow-hidden border border-vault-200/80 shadow-xs hover:shadow-md transition-all flex flex-col cursor-pointer"
+                    >
+                      <div className="relative aspect-square bg-vault-950 overflow-hidden flex items-center justify-center">
+                        {video.thumbnailUrl ? (
+                          <img
+                            src={video.thumbnailUrl}
+                            alt={video.title || 'Video Thumbnail'}
+                            loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-vault-900 via-vault-950 to-vault-900 flex items-center justify-center">
+                            <Video className="w-8 h-8 text-amber-500/40" />
+                          </div>
+                        )}
+
+                        {/* Center Play Indicator */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-10 h-10 rounded-full bg-vault-900/80 group-hover:bg-amber-500 text-amber-300 group-hover:text-vault-950 flex items-center justify-center shadow-lg transition-all border border-amber-500/40 group-hover:scale-110">
+                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                          </div>
+                        </div>
+
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-vault-950/90 via-vault-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-between">
+                          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadMedia(video.fileUrl, fileName, video.id)}
+                              disabled={isDownloading}
+                              className="p-1.5 rounded-xl bg-vault-900/80 hover:bg-amber-600 text-amber-300 hover:text-vault-950 transition-colors shadow-sm"
+                              title="Download video"
+                            >
+                              {isDownloading ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+
+                          <div>
+                            <p className="font-serif font-semibold text-[11px] text-vault-100 line-clamp-1 leading-snug">
+                              {video.title || video.caption || 'Video Memory'}
+                            </p>
+                            <p className="text-[9px] text-vault-300 truncate mt-0.5">
+                              {video.uploadedBy}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mobile Footer */}
+                      <div className="p-2 bg-white flex items-center justify-between gap-1 text-[10px] text-vault-600 border-t border-vault-100 sm:hidden">
+                        <span className="truncate font-medium">{video.title || video.caption || 'Video'}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadMedia(video.fileUrl, fileName, video.id);
+                          }}
+                          disabled={isDownloading}
+                          className="p-1 rounded-lg bg-vault-100 hover:bg-amber-100 text-vault-800 shrink-0"
+                          title="Download"
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-amber-800" />
+                          ) : (
+                            <Download className="w-3 h-3 text-vault-700" />
+                          )}
+                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1259,6 +1391,11 @@ export default function MemoryProfilePage() {
       <PhotoLightbox
         photo={selectedPhoto}
         onClose={() => setSelectedPhoto(null)}
+      />
+
+      <VideoLightbox
+        video={selectedVideo}
+        onClose={() => setSelectedVideo(null)}
       />
 
       <ManageMemoryModal

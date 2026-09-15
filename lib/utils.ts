@@ -71,3 +71,34 @@ export function getInvitationUrl(token: string): string {
   return `${getAppUrl()}/invite/${token}`;
 }
 
+export async function downloadMediaFile(fileUrl: string, defaultFileName: string): Promise<void> {
+  try {
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+
+    let fileName = defaultFileName.trim();
+    if (!fileName.includes('.')) {
+      const urlExt = fileUrl.split('?')[0].split('.').pop()?.toLowerCase();
+      if (urlExt && urlExt.length >= 2 && urlExt.length <= 4) {
+        fileName = `${fileName}.${urlExt}`;
+      }
+    }
+
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    console.warn('Direct blob fetch download failed, falling back to opening URL:', err);
+    window.open(fileUrl, '_blank');
+  }
+}
+
+

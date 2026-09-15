@@ -1,30 +1,34 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Calendar, MapPin, User, Download, Loader2 } from 'lucide-react';
+import { X, Calendar, MapPin, User, Download, Loader2, Video as VideoIcon } from 'lucide-react';
 import { downloadMediaFile } from '@/lib/utils';
 
-interface PhotoLightboxProps {
-  photo: {
-    id?: string;
-    fileUrl: string;
-    caption?: string | null;
-    date?: string | null;
-    location?: string | null;
-    uploadedBy: string;
-  } | null;
+export interface VideoItemData {
+  id: string;
+  fileUrl: string;
+  thumbnailUrl?: string | null;
+  title?: string | null;
+  caption?: string | null;
+  uploadedBy: string;
+  date?: string | null;
+  location?: string | null;
+}
+
+interface VideoLightboxProps {
+  video: VideoItemData | null;
   onClose: () => void;
 }
 
-export function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
+export function VideoLightbox({ video, onClose }: VideoLightboxProps) {
   const [downloading, setDownloading] = useState(false);
 
-  if (!photo) return null;
+  if (!video) return null;
 
   const handleDownload = async () => {
     setDownloading(true);
-    const fileName = photo.caption || `photo-${photo.id ? photo.id.slice(0, 6) : 'memory'}.jpg`;
-    await downloadMediaFile(photo.fileUrl, fileName);
+    const fileName = video.title || video.caption || `video-${video.id.slice(0, 6)}.mp4`;
+    await downloadMediaFile(video.fileUrl, fileName);
     setDownloading(false);
   };
 
@@ -39,42 +43,52 @@ export function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
       </button>
 
       <div className="max-w-5xl w-full flex flex-col md:flex-row bg-vault-900 rounded-3xl overflow-hidden shadow-2xl border border-vault-800 max-h-[90vh]">
-        {/* Photo view */}
-        <div className="flex-1 bg-black flex items-center justify-center min-h-[280px] md:min-h-[500px]">
-          <img
-            src={photo.fileUrl}
-            alt={photo.caption || 'Memory Photo'}
-            className="max-h-[80vh] w-auto max-w-full object-contain"
-          />
+        {/* Video Player Area */}
+        <div className="flex-1 bg-black flex items-center justify-center min-h-[280px] md:min-h-[480px] relative">
+          <video
+            controls
+            autoPlay
+            poster={video.thumbnailUrl || undefined}
+            className="max-h-[80vh] w-full h-full object-contain"
+          >
+            <source src={video.fileUrl} type="video/mp4" />
+            Your browser does not support video playback.
+          </video>
         </div>
 
-        {/* Sidebar details */}
+        {/* Sidebar Details */}
         <div className="w-full md:w-80 p-6 flex flex-col justify-between bg-vault-900 text-vault-100 overflow-y-auto shrink-0">
           <div className="space-y-4">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-medium border border-amber-500/30">
               <User className="w-3.5 h-3.5" />
-              Shared by {photo.uploadedBy}
+              Shared by {video.uploadedBy}
             </div>
 
-            {photo.caption ? (
-              <p className="font-serif text-lg text-vault-100 leading-relaxed">
-                &ldquo;{photo.caption}&rdquo;
+            {video.title && (
+              <h3 className="font-serif text-xl font-bold text-vault-100 leading-tight">
+                {video.title}
+              </h3>
+            )}
+
+            {video.caption ? (
+              <p className="font-serif text-sm text-vault-300 leading-relaxed italic">
+                &ldquo;{video.caption}&rdquo;
               </p>
             ) : (
-              <p className="text-sm italic text-vault-400">No story added for this photo.</p>
+              !video.title && <p className="text-xs italic text-vault-400">No title or story added.</p>
             )}
 
             <div className="pt-4 border-t border-vault-800 space-y-2 text-xs text-vault-400">
-              {photo.date && (
+              {video.date && (
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-amber-400" />
-                  <span>{photo.date}</span>
+                  <span>{video.date}</span>
                 </div>
               )}
-              {photo.location && (
+              {video.location && (
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-amber-400" />
-                  <span>{photo.location}</span>
+                  <span>{video.location}</span>
                 </div>
               )}
             </div>
@@ -89,12 +103,12 @@ export function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
               {downloading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-vault-950" />
-                  <span>Downloading Photo...</span>
+                  <span>Downloading Original Video...</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4 text-vault-950" />
-                  <span>Download Original Photo</span>
+                  <span>Download Original Video</span>
                 </>
               )}
             </button>
@@ -111,4 +125,3 @@ export function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
     </div>
   );
 }
-
