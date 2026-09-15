@@ -1,12 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { del } from '@vercel/blob';
 
 export interface StorageProvider {
   uploadFile(buffer: Buffer, originalFilename: string, mimeType: string): Promise<string>;
   deleteFile(fileUrl: string): Promise<boolean>;
 }
 
-class LocalStorageProvider implements StorageProvider {
+class HybridStorageProvider implements StorageProvider {
   private uploadDir: string;
 
   constructor() {
@@ -33,6 +34,20 @@ class LocalStorageProvider implements StorageProvider {
   }
 
   async deleteFile(fileUrl: string): Promise<boolean> {
+    if (!fileUrl) return false;
+
+    // Vercel Blob file deletion
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      try {
+        await del(fileUrl);
+        return true;
+      } catch (error) {
+        console.error('Failed to delete file from Vercel Blob:', error);
+        return false;
+      }
+    }
+
+    // Local file deletion
     try {
       if (!fileUrl.startsWith('/uploads/')) return false;
       const filename = fileUrl.replace('/uploads/', '');
@@ -46,4 +61,4 @@ class LocalStorageProvider implements StorageProvider {
 }
 
 // Global storage singleton instance
-export const storageProvider: StorageProvider = new LocalStorageProvider();
+export const storageProvider: StorageProvider = new HybridStorageProvider();

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Image as ImageIcon, Upload, Calendar, MapPin, Sparkles, Loader2 } from 'lucide-react';
+import { uploadFileWithProgress } from '@/lib/upload-helper';
 
 interface UploadPhotoModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export function UploadPhotoModal({ isOpen, onClose, memoryId, onPhotoUploaded }:
   const [location, setLocation] = useState('');
   const [uploaderName, setUploaderName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -46,24 +48,15 @@ export function UploadPhotoModal({ isOpen, onClose, memoryId, onPhotoUploaded }:
     e.preventDefault();
     setError('');
     setLoading(true);
+    setUploadProgress(null);
 
     try {
       let finalFileUrl = imageUrlInput;
 
       if (file) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
+        finalFileUrl = await uploadFileWithProgress(file, {
+          onProgress: (percent) => setUploadProgress(percent),
         });
-
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) {
-          throw new Error(uploadData.error || 'Failed to upload image file');
-        }
-        finalFileUrl = uploadData.url;
       }
 
       if (!finalFileUrl) {
@@ -82,7 +75,14 @@ export function UploadPhotoModal({ isOpen, onClose, memoryId, onPhotoUploaded }:
         }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        const textMsg = await res.text();
+        throw new Error(textMsg || 'Failed to save photo record to database.');
+      }
+
       if (!res.ok) {
         throw new Error(data.error || 'Failed to add photo');
       }
@@ -95,12 +95,14 @@ export function UploadPhotoModal({ isOpen, onClose, memoryId, onPhotoUploaded }:
       setDate('');
       setLocation('');
       setUploaderName('');
+      setUploadProgress(null);
       onPhotoUploaded();
       onClose();
     } catch (err: any) {
       setError(err.message || 'An error occurred while adding photo');
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -249,6 +251,21 @@ export function UploadPhotoModal({ isOpen, onClose, memoryId, onPhotoUploaded }:
             />
           </div>
 
+          {uploadProgress !== null && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between text-xs font-semibold text-vault-700">
+                <span>Uploading directly to storage...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-vault-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-amber-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
           <div className="pt-3">
             <button
               type="submit"
@@ -258,7 +275,7 @@ export function UploadPhotoModal({ isOpen, onClose, memoryId, onPhotoUploaded }:
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
-                  Preserving Photo...
+                  {uploadProgress !== null ? `Uploading ${uploadProgress}%...` : 'Preserving Photo...'}
                 </>
               ) : (
                 <>
