@@ -32,6 +32,10 @@ import {
   Settings,
   BookOpen,
   Milestone,
+  Sliders,
+  MoreVertical,
+  Edit3,
+  Trash2,
 } from 'lucide-react';
 
 import { QRCodeModal } from '@/components/QRCodeModal';
@@ -48,6 +52,7 @@ import { AIMemoryHighlights } from '@/components/AIMemoryHighlights';
 import { AITagManager } from '@/components/AITagManager';
 import { RelatedMemories } from '@/components/RelatedMemories';
 import { AISettingsModal } from '@/components/AISettingsModal';
+import { ManageMemoryModal } from '@/components/ManageMemoryModal';
 import { formatDate } from '@/lib/utils';
 
 interface MemorySpaceData {
@@ -112,6 +117,7 @@ interface MemorySpaceData {
     id: string;
     role: string;
     user: {
+      id: string;
       name: string;
       email: string;
       profileImage?: string | null;
@@ -138,6 +144,11 @@ export default function MemoryProfilePage() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+
+  // Manage Memory State
+  const [manageModalOpen, setManageModalOpen] = useState(false);
+  const [manageInitialTab, setManageInitialTab] = useState<'details' | 'privacy' | 'media' | 'timeline' | 'contributors' | 'invitations' | 'delete'>('details');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Lightbox state
   const [selectedPhoto, setSelectedPhoto] = useState<MemorySpaceData['photos'][0] | null>(null);
@@ -214,6 +225,12 @@ export default function MemoryProfilePage() {
 
   const canEdit = ['OWNER', 'CONTRIBUTOR'].includes(space.userRole) || space.privacy === 'PUBLIC' || space.privacy === 'UNLISTED';
 
+  const openManagementTab = (tab: typeof manageInitialTab) => {
+    setManageInitialTab(tab);
+    setManageModalOpen(true);
+    setDropdownOpen(false);
+  };
+
   return (
     <div className="min-h-screen pb-20 relative">
       {/* DIGITAL SCRAPBOOK HERO HEADER */}
@@ -221,10 +238,22 @@ export default function MemoryProfilePage() {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Top Info Tag & Actions */}
           <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-vault-800/80 text-xs">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-mono font-semibold border border-amber-500/30">
                 <QrCode className="w-3.5 h-3.5" />
                 {space.memoryId}
+              </span>
+
+              {/* PRIVACY STATUS BADGE */}
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                space.privacy === 'PUBLIC'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : space.privacy === 'UNLISTED'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+              }`}>
+                {space.privacy === 'PUBLIC' ? <Globe className="w-3 h-3" /> : space.privacy === 'UNLISTED' ? <EyeOff className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                <span>{space.privacy === 'PUBLIC' ? 'Public' : space.privacy === 'UNLISTED' ? 'Unlisted' : 'Private'}</span>
               </span>
 
               <span className="text-vault-400 font-medium hidden sm:inline">
@@ -260,13 +289,88 @@ export default function MemoryProfilePage() {
 
               {space.userRole === 'OWNER' && (
                 <>
+                  {/* MANAGE MEMORY BUTTON FOR OWNER */}
+                  <button
+                    onClick={() => openManagementTab('details')}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-500 hover:bg-amber-600 text-vault-950 font-bold shadow-md hover:scale-[1.02] transition-all"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-vault-950" />
+                    Manage Memory
+                  </button>
+
                   <button
                     onClick={() => setInviteModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-600 hover:bg-amber-700 text-vault-950 font-bold shadow-sm transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-vault-800 hover:bg-vault-700 text-amber-300 font-semibold border border-vault-700 transition-colors"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
-                    Invite Friends
+                    Invite
                   </button>
+
+                  {/* OWNER DROPDOWN MENU */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      className="p-2 rounded-full bg-vault-800 hover:bg-vault-700 text-vault-300 transition-colors"
+                      title="Manage Space Options"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+
+                    {dropdownOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-vault-200 py-2 z-50 text-vault-900 text-xs font-semibold animate-fadeIn">
+                        <button
+                          onClick={() => openManagementTab('details')}
+                          className="w-full text-left px-4 py-2 hover:bg-vault-50 flex items-center gap-2"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                          Edit Details
+                        </button>
+                        <button
+                          onClick={() => openManagementTab('privacy')}
+                          className="w-full text-left px-4 py-2 hover:bg-vault-50 flex items-center gap-2"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-amber-700" />
+                          Privacy Settings
+                        </button>
+                        <button
+                          onClick={() => openManagementTab('media')}
+                          className="w-full text-left px-4 py-2 hover:bg-vault-50 flex items-center gap-2"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-amber-700" />
+                          Manage Media
+                        </button>
+                        <button
+                          onClick={() => openManagementTab('timeline')}
+                          className="w-full text-left px-4 py-2 hover:bg-vault-50 flex items-center gap-2"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-amber-700" />
+                          Manage Timeline
+                        </button>
+                        <button
+                          onClick={() => openManagementTab('contributors')}
+                          className="w-full text-left px-4 py-2 hover:bg-vault-50 flex items-center gap-2"
+                        >
+                          <UserPlus className="w-3.5 h-3.5 text-amber-700" />
+                          Manage Contributors
+                        </button>
+                        <button
+                          onClick={() => openManagementTab('invitations')}
+                          className="w-full text-left px-4 py-2 hover:bg-vault-50 flex items-center gap-2"
+                        >
+                          <Mail className="w-3.5 h-3.5 text-amber-700" />
+                          Sent Invitations
+                        </button>
+                        <div className="my-1 border-t border-vault-100"></div>
+                        <button
+                          onClick={() => openManagementTab('delete')}
+                          className="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          Delete Memory
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     onClick={() => setAiSettingsOpen(true)}
@@ -963,6 +1067,14 @@ export default function MemoryProfilePage() {
       <PhotoLightbox
         photo={selectedPhoto}
         onClose={() => setSelectedPhoto(null)}
+      />
+
+      <ManageMemoryModal
+        isOpen={manageModalOpen}
+        onClose={() => setManageModalOpen(false)}
+        space={space}
+        onMemoryUpdated={fetchSpace}
+        initialTab={manageInitialTab}
       />
     </div>
   );
