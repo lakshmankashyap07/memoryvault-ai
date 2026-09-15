@@ -24,6 +24,7 @@ import {
   Upload,
   Loader2,
 } from 'lucide-react';
+import { uploadFileWithProgress } from '@/lib/upload-helper';
 import { QRCodeModal } from '@/components/QRCodeModal';
 
 const RELATIONSHIP_OPTIONS = [
@@ -127,18 +128,10 @@ export default function CreateMemoryPage() {
   const handleProfileFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const formData = new FormData();
-      formData.append('file', file);
       try {
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        const uploadData = await uploadRes.json();
-        if (uploadRes.ok) {
-          setProfileImage(uploadData.url);
-        }
-      } catch (err) {
+        const url = await uploadFileWithProgress(file);
+        setProfileImage(url);
+      } catch (err: any) {
         console.error('Profile photo upload error:', err);
       }
     }

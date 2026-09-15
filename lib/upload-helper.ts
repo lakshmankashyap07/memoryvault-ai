@@ -5,10 +5,13 @@ export interface UploadOptions {
 }
 
 /**
- * Robust client-side file upload helper.
- * 1. Attempts direct upload to Vercel Blob via `@vercel/blob/client` (supports large files, streaming progress).
- * 2. Falls back to local `/api/upload` endpoint if Vercel Blob token is unavailable or in local dev mode.
- * 3. Safely handles HTTP errors without crashing JSON parsers.
+ * Direct Client-Side Upload Helper for MemoryVault.
+ *
+ * Direct Flow:
+ * 1. Client calls `upload()` from `@vercel/blob/client`.
+ * 2. `/api/upload/blob` authenticates the user session & issues a client token.
+ * 3. Browser streams the file payload directly to Vercel Blob CDN.
+ * 4. Returns the public Blob URL for metadata storage in Prisma.
  */
 export async function uploadFileWithProgress(
   file: File,
@@ -16,9 +19,10 @@ export async function uploadFileWithProgress(
 ): Promise<string> {
   const onProgress = options?.onProgress;
 
-  // Try Direct Vercel Blob Upload
   try {
     if (onProgress) onProgress(5);
+
+    // Direct Browser-to-Vercel-Blob Upload
     const newBlob = await upload(file.name, file, {
       access: 'public',
       handleUploadUrl: '/api/upload/blob',
@@ -32,9 +36,24 @@ export async function uploadFileWithProgress(
     if (onProgress) onProgress(100);
     return newBlob.url;
   } catch (blobError: any) {
-    console.warn('Vercel Blob upload unavailable/failed, falling back to local storage handler:', blobError?.message);
-    
-    // Fallback: XHR Post to /api/upload with progress tracking
+    console.warn('Vercel Blob direct upload attempt error:', blobError?.message || blobError);
+
+    const isLocalDev =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    // Do NOT fall back to server payload upload on Vercel or for large files (> 4MB)
+    // because serverless functions reject payloads > 4.5MB with HTTP 413.
+    if (!isLocalDev || file.size > 4 * 1024 * 1024) {
+      let rawMessage = blobError?.message || 'Vercel Blob upload failed.';
+      if (rawMessage.includes('No token found') || rawMessage.includes('BLOB_READ_WRITE_TOKEN')) {
+        rawMessage =
+          'Vercel Blob storage is not configured. Please set the BLOB_READ_WRITE_TOKEN environment variable in your Vercel Project Settings.';
+      }
+      throw new Error(rawMessage);
+    }
+
+    // Local development fallback for small files (< 4MB) when running locally without Vercel Blob
     return new Promise<string>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
@@ -60,14 +79,13 @@ export async function uploadFileWithProgress(
             reject(new Error(`Server returned unexpected response: ${xhr.responseText.substring(0, 100)}`));
           }
         } else {
-          // Parse HTML error page (like HTTP 413 Payload Too Large) safely
           let errorMsg = `Upload failed with status ${xhr.status}`;
           try {
             const parsed = JSON.parse(xhr.responseText);
             if (parsed.error) errorMsg = parsed.error;
           } catch {
             if (xhr.status === 413) {
-              errorMsg = 'File size exceeds server payload limits. Please choose a smaller file or configure Vercel Blob.';
+              errorMsg = 'File size exceeds server payload limits (4.5MB). Vercel Blob configuration is required for production uploads.';
             } else if (xhr.responseText) {
               errorMsg = xhr.responseText.substring(0, 150);
             }
@@ -77,7 +95,7 @@ export async function uploadFileWithProgress(
       });
 
       xhr.addEventListener('error', () => {
-        reject(new Error('Network error occurred during file upload. Please check your internet connection.'));
+        reject(new Error('Network error occurred during file upload. Please check your connection.'));
       });
 
       xhr.open('POST', '/api/upload');
