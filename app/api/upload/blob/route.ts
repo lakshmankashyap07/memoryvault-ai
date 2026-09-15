@@ -20,12 +20,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async (_pathname, _clientPayload) => {
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
         // Authenticate user before issuing client upload token
         const currentUser = await getCurrentUser();
         if (!currentUser) {
           throw new Error('Unauthorized: Please log in to upload files');
         }
+
+        console.log('[Vercel Blob] Issuing upload token for file:', {
+          pathname,
+          clientPayload,
+          user: currentUser.email,
+        });
 
         return {
           allowedContentTypes: [
@@ -101,11 +107,12 @@ export async function POST(request: Request): Promise<NextResponse> {
             'application/x-tar',
             'application/gzip',
 
-            // Data & Fallback MIME types
+            // Data & Application Category Wildcard
             'application/json',
             'application/rtf',
             'application/xml',
             'application/octet-stream',
+            'application/*',
           ],
           tokenPayload: JSON.stringify({
             userId: currentUser.id,
@@ -124,4 +131,5 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 }
+
 
