@@ -29,6 +29,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         return {
           allowedContentTypes: [
+            // Images
             'image/*',
             'image/jpeg',
             'image/jpg',
@@ -40,6 +41,8 @@ export async function POST(request: Request): Promise<NextResponse> {
             'image/heic',
             'image/heif',
             'image/avif',
+
+            // Videos
             'video/*',
             'video/mp4',
             'video/quicktime',
@@ -48,13 +51,60 @@ export async function POST(request: Request): Promise<NextResponse> {
             'video/3gpp',
             'video/x-msvideo',
             'video/x-matroska',
+
+            // Audio
             'audio/*',
             'audio/mpeg',
             'audio/wav',
             'audio/mp4',
             'audio/aac',
             'audio/ogg',
+
+            // Documents (PDF, Word)
             'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
+            'application/vnd.ms-word.document.macroEnabled.12',
+
+            // Spreadsheets (Excel, CSV)
+            'text/csv',
+            'text/x-csv',
+            'text/comma-separated-values',
+            'application/csv',
+            'application/excel',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.template',
+            'application/vnd.ms-excel.sheet.macroEnabled.12',
+
+            // Presentations (PowerPoint)
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+            'application/vnd.openxmlformats-officedocument.presentationml.template',
+
+            // Plain Text & Markdown
+            'text/plain',
+            'text/html',
+            'text/markdown',
+            'text/xml',
+            'text/rtf',
+            'text/*',
+
+            // Archives (ZIP, RAR, 7Z, TAR, GZ)
+            'application/zip',
+            'application/x-zip-compressed',
+            'application/x-zip',
+            'application/x-rar-compressed',
+            'application/x-7z-compressed',
+            'application/x-tar',
+            'application/gzip',
+
+            // Data & Fallback MIME types
+            'application/json',
+            'application/rtf',
+            'application/xml',
             'application/octet-stream',
           ],
           tokenPayload: JSON.stringify({
@@ -74,3 +124,4 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 }
+
