@@ -7,11 +7,14 @@ export interface UploadOptions {
 /**
  * Direct Client-Side Upload Helper for MemoryVault.
  *
- * Direct Flow:
- * 1. Client calls `upload()` from `@vercel/blob/client`.
- * 2. `/api/upload/blob` authenticates the user session & issues a client token.
- * 3. Browser streams the file payload directly to Vercel Blob CDN.
- * 4. Returns the public Blob URL for metadata storage in Prisma.
+ * Desired Flow:
+ * Browser
+ * → authenticated MemoryVault upload route (/api/upload/blob)
+ * → handleUpload()
+ * → temporary Vercel Blob client token
+ * → browser uploads directly to Vercel Blob
+ * → upload completion
+ * → Prisma MemoryPhoto/MemoryVideo metadata is saved
  */
 export async function uploadFileWithProgress(
   file: File,
@@ -38,17 +41,44 @@ export async function uploadFileWithProgress(
   } catch (blobError: any) {
     console.warn('Vercel Blob direct upload attempt error:', blobError?.message || blobError);
 
+    // Inspect server response from /api/upload/blob to get exact server-side error reason
+    let exactServerError = '';
+    try {
+      const diagRes = await fetch('/api/upload/blob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'blob.generate-client-token',
+          payload: { pathname: file.name, multipart: false, clientPayload: null },
+        }),
+      });
+      if (!diagRes.ok) {
+        const diagData = await diagRes.json().catch(() => ({}));
+        if (diagData.error) {
+          exactServerError = diagData.error;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to query token diagnostic route:', e);
+    }
+
     const isLocalDev =
       typeof window !== 'undefined' &&
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-    // Do NOT fall back to server payload upload on Vercel or for large files (> 4MB)
-    // because serverless functions reject payloads > 4.5MB with HTTP 413.
+    // On Vercel production or for large files (> 4MB), strictly enforce Vercel Blob
     if (!isLocalDev || file.size > 4 * 1024 * 1024) {
-      let rawMessage = blobError?.message || 'Vercel Blob upload failed.';
-      if (rawMessage.includes('No token found') || rawMessage.includes('BLOB_READ_WRITE_TOKEN')) {
+      if (exactServerError) {
+        throw new Error(exactServerError);
+      }
+      let rawMessage = blobError?.message || 'Vercel Blob client upload failed.';
+      if (
+        rawMessage.includes('No token found') ||
+        rawMessage.includes('BLOB_READ_WRITE_TOKEN') ||
+        rawMessage.includes('Failed to retrieve')
+      ) {
         rawMessage =
-          'Vercel Blob storage is not configured. Please set the BLOB_READ_WRITE_TOKEN environment variable in your Vercel Project Settings.';
+          'Vercel Blob storage is not configured on this environment. Please ensure a Vercel Blob store is linked to your project (which provides BLOB_READ_WRITE_TOKEN).';
       }
       throw new Error(rawMessage);
     }
