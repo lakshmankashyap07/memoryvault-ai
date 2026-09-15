@@ -65,23 +65,33 @@ function isImageFile(file: File): boolean {
   return false;
 }
 
-// Controlled concurrency executor (uploads up to N files simultaneously)
+// Maximum 4 SIMULTANEOUS uploads at the same time
+const MAX_CONCURRENT_UPLOADS = 4;
+
+// Controlled concurrency queue executor
 async function runWithConcurrency<T, R>(
   items: T[],
   limit: number,
   fn: (item: T) => Promise<R>
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
-  let index = 0;
+  // Shallow copy task queue with original indices
+  const queue = items.map((item, index) => ({ item, index }));
 
   async function worker() {
-    while (index < items.length) {
-      const currentIndex = index++;
-      results[currentIndex] = await fn(items[currentIndex]);
+    while (queue.length > 0) {
+      const task = queue.shift();
+      if (!task) break;
+      try {
+        results[task.index] = await fn(task.item);
+      } catch (err) {
+        console.error('Worker task error:', err);
+      }
     }
   }
 
-  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+  const workerCount = Math.min(limit, items.length);
+  const workers = Array.from({ length: workerCount }, () => worker());
   await Promise.all(workers);
   return results;
 }
@@ -106,7 +116,7 @@ export function UploadPhotoModal({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Clean up Object URLs when modal unmounts or selectedPhotos change
+  // Clean up Object URLs when modal unmounts
   useEffect(() => {
     return () => {
       selectedPhotos.forEach((item) => {
@@ -231,7 +241,7 @@ export function UploadPhotoModal({
     }
   };
 
-  // Execute batch upload with controlled concurrency = 3
+  // Execute batch upload with controlled concurrency (up to 4 simultaneous uploads)
   const handleUploadBatch = async (itemsToUpload: PhotoItem[]) => {
     if (itemsToUpload.length === 0) return;
 
@@ -317,8 +327,8 @@ export function UploadPhotoModal({
       }
     };
 
-    // Concurrency limit = 3 parallel uploads
-    await runWithConcurrency(itemsToUpload, 3, uploadSinglePhoto);
+    // Concurrency limit = 4 simultaneous uploads
+    await runWithConcurrency(itemsToUpload, MAX_CONCURRENT_UPLOADS, uploadSinglePhoto);
 
     setLoading(false);
 
@@ -328,7 +338,7 @@ export function UploadPhotoModal({
     }
 
     if (failCount === 0) {
-      setBatchSuccessMessage(`✓ ${successCount} photo(s) added successfully!`);
+      setBatchSuccessMessage(`✓ ${successCount} photo(s) uploaded successfully!`);
       // Auto-close modal after brief delay when all succeed
       setTimeout(() => {
         handleClose();
@@ -376,7 +386,7 @@ export function UploadPhotoModal({
             <div>
               <h3 className="font-serif font-bold text-lg text-white">Add Photo Memories</h3>
               <p className="text-xs text-vault-400">
-                Select and preserve multiple photos with batch story details
+                Select and upload any number of photos in one batch
               </p>
             </div>
           </div>
@@ -425,7 +435,7 @@ export function UploadPhotoModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-semibold uppercase tracking-wider text-vault-700">
-                Select Photos {selectedPhotos.length > 0 && `(${selectedPhotos.length})`}
+                Selected Photos {selectedPhotos.length > 0 && `(${selectedPhotos.length})`}
               </label>
 
               {selectedPhotos.length > 0 && (
@@ -443,8 +453,11 @@ export function UploadPhotoModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/heic"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/heic,image/avif"
               multiple
+              onClick={(e) => {
+                (e.target as HTMLInputElement).value = '';
+              }}
               onChange={handleFileChange}
               className="hidden"
             />
@@ -470,7 +483,7 @@ export function UploadPhotoModal({
                       Drop photos here, or <span className="text-amber-800 underline">Browse files</span>
                     </p>
                     <p className="text-[11px] text-vault-500 mt-1">
-                      Select multiple images (PNG, JPG, WEBP, GIF, HEIC)
+                      Select multiple photos (PNG, JPG, WEBP, GIF, HEIC)
                     </p>
                   </div>
                 </div>
@@ -478,7 +491,7 @@ export function UploadPhotoModal({
             ) : (
               /* Photo Preview Grid */
               <div className="space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 sm:max-h-64 overflow-y-auto p-2.5 border border-vault-200 rounded-2xl bg-vault-50/50 no-scrollbar">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-72 sm:max-h-80 overflow-y-auto p-2.5 border border-vault-200 rounded-2xl bg-vault-50/50">
                   {selectedPhotos.map((photo) => (
                     <div
                       key={photo.id}
@@ -526,10 +539,18 @@ export function UploadPhotoModal({
                           </span>
                         )}
 
-                        {photo.status === 'idle' && photo.size > 0 && (
-                          <span className="shrink-0 text-[9px] text-vault-300 font-mono">
-                            {formatBytes(photo.size)}
-                          </span>
+                        {photo.status === 'idle' && (
+                          loading ? (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-vault-700/90 text-vault-200 font-medium text-[9px]">
+                              ⏳ Waiting
+                            </span>
+                          ) : (
+                            photo.size > 0 && (
+                              <span className="shrink-0 text-[9px] text-vault-300 font-mono">
+                                {formatBytes(photo.size)}
+                              </span>
+                            )
+                          )
                         )}
                       </div>
                     </div>
@@ -565,7 +586,7 @@ export function UploadPhotoModal({
               <div className="flex items-center justify-between text-xs font-semibold text-amber-900">
                 <span className="flex items-center gap-1.5">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-700" />
-                  Uploading batch... ({completedCount} / {totalCount} completed)
+                  Uploading {completedCount} of {totalCount} photos...
                 </span>
                 <span>{overallProgress}%</span>
               </div>
@@ -688,3 +709,4 @@ export function UploadPhotoModal({
     </div>
   );
 }
+
