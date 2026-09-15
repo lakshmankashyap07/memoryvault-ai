@@ -67,13 +67,7 @@ export function AITagManager({ memoryId }: AITagManagerProps) {
 
   return (
     <div className="bg-white rounded-3xl p-6 border border-vault-200 shadow-soft space-y-4">
-      <div className="flex items-center justify-between">
-        <h4 className="font-serif font-bold text-sm text-vault-900 flex items-center gap-2">
-          <Tag className="w-4 h-4 text-amber-700" />
-          Memory Space Tags
-        </h4>
-        <span className="text-[10px] text-vault-400">Organized by AI & You</span>
-      </div>
+      
 
       {/* Saved Tags list */}
       <div className="flex flex-wrap items-center gap-2">
@@ -101,38 +95,11 @@ export function AITagManager({ memoryId }: AITagManagerProps) {
           }}
           className="inline-flex items-center gap-1"
         >
-          <input
-            type="text"
-            placeholder="+ Custom Tag"
-            value={newTagInput}
-            onChange={(e) => setNewTagInput(e.target.value)}
-            className="px-2.5 py-1 rounded-full border border-dashed border-vault-300 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none w-28"
-          />
+          
         </form>
       </div>
 
-      {/* AI Suggested Tags */}
-      {suggestedTags.length > 0 && (
-        <div className="pt-3 border-t border-vault-100 space-y-2">
-          <p className="text-[11px] font-semibold text-amber-800 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-600" />
-            AI Suggested Tags (Click to add):
-          </p>
-
-          <div className="flex flex-wrap gap-1.5">
-            {suggestedTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => handleAddTag(tag)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-medium transition-colors"
-              >
-                <Plus className="w-3 h-3 text-amber-700" />
-                <span>{tag}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 }
