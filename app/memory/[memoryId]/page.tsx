@@ -47,6 +47,7 @@ import { QRCodeModal } from '@/components/QRCodeModal';
 import { ShareModal } from '@/components/ShareModal';
 import { UploadPhotoModal } from '@/components/UploadPhotoModal';
 import { UploadVideoModal } from '@/components/UploadVideoModal';
+import { GenerateThumbnailsModal } from '@/components/GenerateThumbnailsModal';
 import { UploadFileModal } from '@/components/UploadFileModal';
 import { EditFileModal } from '@/components/EditFileModal';
 import { AddMessageModal } from '@/components/AddMessageModal';
@@ -260,6 +261,7 @@ export default function MemoryProfilePage() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [generateThumbnailsOpen, setGenerateThumbnailsOpen] = useState(false);
 
   // Manage Memory State
   const [manageModalOpen, setManageModalOpen] = useState(false);
@@ -959,23 +961,39 @@ export default function MemoryProfilePage() {
         )}
 
         {/* VIDEOS TAB */}
-        {activeTab === 'videos' && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-serif text-2xl font-bold text-vault-950">Video Gallery</h2>
-                <p className="text-xs text-vault-600">6 videos per row gallery with play indicator & download support</p>
+        {activeTab === 'videos' && (() => {
+          const missingThumbnailCount = space.videos.filter(
+            (v) => !v.thumbnailUrl || v.thumbnailUrl.trim() === ''
+          ).length;
+
+          return (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-serif text-2xl font-bold text-vault-950">Video Gallery</h2>
+                  <p className="text-xs text-vault-600">6 videos per row gallery with play indicator & download support</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {canEdit && missingThumbnailCount > 0 && (
+                    <button
+                      onClick={() => setGenerateThumbnailsOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 font-semibold text-xs border border-amber-500/40 transition-all shadow-xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                      Generate Missing Thumbnails ({missingThumbnailCount})
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button
+                      onClick={() => setVideoModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vault-900 hover:bg-vault-950 text-amber-100 font-semibold text-xs shadow-sm transition-colors"
+                    >
+                      <Video className="w-4 h-4 text-amber-300" />
+                      + Add Video
+                    </button>
+                  )}
+                </div>
               </div>
-              {canEdit && (
-                <button
-                  onClick={() => setVideoModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vault-900 hover:bg-vault-950 text-amber-100 font-semibold text-xs shadow-sm transition-colors"
-                >
-                  <Video className="w-4 h-4 text-amber-300" />
-                  + Add Video
-                </button>
-              )}
-            </div>
 
             {space.videos.length === 0 ? (
               <div className="bg-white rounded-3xl p-12 text-center border border-vault-200 space-y-3">
@@ -1008,7 +1026,8 @@ export default function MemoryProfilePage() {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* MESSAGES TAB */}
         {activeTab === 'messages' && (
@@ -1428,6 +1447,14 @@ export default function MemoryProfilePage() {
         space={space}
         onMemoryUpdated={fetchSpace}
         initialTab={manageInitialTab}
+      />
+
+      <GenerateThumbnailsModal
+        isOpen={generateThumbnailsOpen}
+        onClose={() => setGenerateThumbnailsOpen(false)}
+        memoryId={space.memoryId}
+        videos={space.videos}
+        onThumbnailsGenerated={fetchSpace}
       />
     </div>
   );

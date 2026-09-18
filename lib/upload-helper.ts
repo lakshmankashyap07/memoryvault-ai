@@ -263,3 +263,42 @@ export function generateVideoThumbnail(file: File): Promise<File | null> {
   });
 }
 
+/**
+ * Generates a video thumbnail image File from a remote video URL.
+ * Fetches the video stream as a local Blob to avoid any CORS/Tainted Canvas issues,
+ * then generates a thumbnail File via HTMLCanvasElement frame capture.
+ */
+export async function generateVideoThumbnailFromUrl(
+  videoUrl: string,
+  identifier: string
+): Promise<File | null> {
+  let localBlobUrl = '';
+  try {
+    const res = await fetch(videoUrl);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch video (HTTP ${res.status})`);
+    }
+    const blob = await res.blob();
+    localBlobUrl = URL.createObjectURL(blob);
+
+    const tempFile = new File([blob], `video-${identifier}.mp4`, {
+      type: blob.type || 'video/mp4',
+    });
+
+    const thumbFile = await generateVideoThumbnail(tempFile);
+    return thumbFile;
+  } catch (err) {
+    console.warn(`Could not generate thumbnail from URL ${videoUrl}:`, err);
+    return null;
+  } finally {
+    if (localBlobUrl) {
+      try {
+        URL.revokeObjectURL(localBlobUrl);
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+

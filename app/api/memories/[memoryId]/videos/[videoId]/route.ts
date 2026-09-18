@@ -55,3 +55,57 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete video' }, { status: 500 });
   }
 }
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: { memoryId: string; videoId: string } }
+) {
+  try {
+    const { memoryId, videoId } = params;
+    const currentUser = await getCurrentUser();
+
+    const space = await prisma.memorySpace.findUnique({
+      where: { memoryId },
+      include: { contributors: true },
+    });
+
+    if (!space) {
+      return NextResponse.json({ error: 'Memory Space not found' }, { status: 404 });
+    }
+
+    let canEdit = space.privacy === 'PUBLIC' || space.privacy === 'UNLISTED';
+    if (currentUser) {
+      if (space.ownerId === currentUser.id || space.contributors.some((c) => c.userId === currentUser.id)) {
+        canEdit = true;
+      }
+    }
+
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const video = await prisma.memoryVideo.findUnique({
+      where: { id: videoId },
+    });
+
+    if (!video || video.memorySpaceId !== space.id) {
+      return NextResponse.json({ error: 'Video not found' }, { status: 404 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { thumbnailUrl } = body;
+
+    const updatedVideo = await prisma.memoryVideo.update({
+      where: { id: videoId },
+      data: {
+        thumbnailUrl: thumbnailUrl || null,
+      },
+    });
+
+    return NextResponse.json({ video: updatedVideo, success: true });
+  } catch (error) {
+    console.error('Update video error:', error);
+    return NextResponse.json({ error: 'Failed to update video' }, { status: 500 });
+  }
+}
+
