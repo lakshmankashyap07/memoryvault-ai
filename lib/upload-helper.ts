@@ -139,8 +139,8 @@ export async function uploadFileWithProgress(
  * Seeks to ~1.0 second (or midpoint for short videos) and captures a JPEG blob frame via HTMLCanvasElement.
  * Returns null if thumbnail generation is unsupported or fails, allowing upload to proceed gracefully.
  */
-export function generateVideoThumbnail(file: File): Promise<File | null> {
-  return new Promise((resolve) => {
+export function generateVideoThumbnail(file: File, timeoutMs: number = 30000): Promise<File | null> {
+  return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !file || !file.type.startsWith('video/')) {
       resolve(null);
       return;
@@ -173,47 +173,51 @@ export function generateVideoThumbnail(file: File): Promise<File | null> {
       }
     };
 
-    // Safety timeout of 5 seconds
+    // Safety timeout of 30 seconds
     const timer = setTimeout(() => {
       if (!completed) {
-        console.warn(`Thumbnail generation timed out for video: ${file.name}`);
+        const msg = `Frame extraction timed out after ${timeoutMs / 1000}s for video: ${file.name}`;
+        console.warn(`[Thumbnail Backfill] ${msg}`);
         cleanup(videoUrl, video);
-        resolve(null);
+        reject(new Error(msg));
       }
-    }, 5000);
+    }, timeoutMs);
 
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.muted = true;
     video.playsInline = true;
+    video.crossOrigin = 'anonymous';
 
     try {
       videoUrl = URL.createObjectURL(file);
-    } catch (e) {
+    } catch (e: any) {
       clearTimeout(timer);
-      console.warn(`Could not create object URL for video ${file.name}:`, e);
-      resolve(null);
+      const msg = `Failed to create Blob URL: ${e?.message || e}`;
+      console.warn(`[Thumbnail Backfill] ${msg}`);
+      reject(new Error(msg));
       return;
     }
 
     video.onerror = (e) => {
       clearTimeout(timer);
-      console.warn(`Video load error while generating thumbnail for ${file.name}:`, e);
+      const msg = `HTMLVideoElement failed to load video ${file.name}`;
+      console.warn(`[Thumbnail Backfill] ${msg}:`, e);
       cleanup(videoUrl, video);
-      resolve(null);
+      reject(new Error(msg));
     };
 
     video.onloadedmetadata = () => {
       try {
         const duration = video.duration || 0;
-        // Seek to 1s or midpoint if duration < 1s
         const seekTime = Math.min(1.0, duration > 0.2 ? duration / 2 : 0);
         video.currentTime = seekTime;
-      } catch (seekErr) {
+      } catch (seekErr: any) {
         clearTimeout(timer);
-        console.warn(`Error seeking video ${file.name}:`, seekErr);
+        const msg = `Error seeking video timestamp: ${seekErr?.message || seekErr}`;
+        console.warn(`[Thumbnail Backfill] ${msg}`);
         cleanup(videoUrl, video);
-        resolve(null);
+        reject(new Error(msg));
       }
     };
 
@@ -229,7 +233,7 @@ export function generateVideoThumbnail(file: File): Promise<File | null> {
         if (!ctx) {
           clearTimeout(timer);
           cleanup(videoUrl, video);
-          resolve(null);
+          reject(new Error('Canvas 2D context unavailable'));
           return;
         }
 
@@ -245,17 +249,18 @@ export function generateVideoThumbnail(file: File): Promise<File | null> {
               const thumbFile = new File([blob], thumbFileName, { type: 'image/jpeg' });
               resolve(thumbFile);
             } else {
-              resolve(null);
+              reject(new Error('Canvas toBlob returned empty image'));
             }
           },
           'image/jpeg',
           0.85
         );
-      } catch (drawErr) {
+      } catch (drawErr: any) {
         clearTimeout(timer);
-        console.warn(`Canvas export error for thumbnail ${file.name}:`, drawErr);
+        const msg = `Canvas draw error (CORS or tainted frame): ${drawErr?.message || drawErr}`;
+        console.warn(`[Thumbnail Backfill] ${msg}`);
         cleanup(videoUrl, video);
-        resolve(null);
+        reject(new Error(msg));
       }
     };
 
@@ -267,38 +272,68 @@ export function generateVideoThumbnail(file: File): Promise<File | null> {
  * Generates a video thumbnail image File from a remote video URL.
  * Fetches the video stream as a local Blob to avoid any CORS/Tainted Canvas issues,
  * then generates a thumbnail File via HTMLCanvasElement frame capture.
+ * If direct fetch fails, automatically retries via server proxy URL.
  */
 export async function generateVideoThumbnailFromUrl(
   videoUrl: string,
-  identifier: string
-): Promise<File | null> {
-  let localBlobUrl = '';
+  identifier: string,
+  proxyUrl?: string
+): Promise<File> {
+  console.log(`[Thumbnail Backfill] Starting thumbnail process for videoId: ${identifier}`);
+  console.log(`[Thumbnail Backfill] Target videoUrl: ${videoUrl}`);
+
+  let res: Response | null = null;
+  let fetchErrorMsg = '';
+
+  // 1. Direct fetch attempt
   try {
-    const res = await fetch(videoUrl);
+    res = await fetch(videoUrl);
     if (!res.ok) {
-      throw new Error(`Failed to fetch video (HTTP ${res.status})`);
+      fetchErrorMsg = `Direct fetch failed (HTTP ${res.status} ${res.statusText})`;
     }
-    const blob = await res.blob();
-    localBlobUrl = URL.createObjectURL(blob);
+  } catch (err: any) {
+    fetchErrorMsg = `Direct fetch network error: ${err?.message || err}`;
+  }
 
-    const tempFile = new File([blob], `video-${identifier}.mp4`, {
-      type: blob.type || 'video/mp4',
-    });
-
-    const thumbFile = await generateVideoThumbnail(tempFile);
-    return thumbFile;
-  } catch (err) {
-    console.warn(`Could not generate thumbnail from URL ${videoUrl}:`, err);
-    return null;
-  } finally {
-    if (localBlobUrl) {
-      try {
-        URL.revokeObjectURL(localBlobUrl);
-      } catch {
-        // ignore
+  // 2. Server proxy fallback if direct fetch fails
+  if ((!res || !res.ok) && proxyUrl) {
+    console.log(`[Thumbnail Backfill] Direct fetch unreadable (${fetchErrorMsg}). Fallback to server proxy: ${proxyUrl}`);
+    try {
+      res = await fetch(proxyUrl);
+      if (!res.ok) {
+        throw new Error(`Proxy fetch failed (HTTP ${res.status} ${res.statusText})`);
       }
+    } catch (proxyErr: any) {
+      throw new Error(`Video fetch failed via direct & proxy route. Direct: ${fetchErrorMsg}. Proxy: ${proxyErr?.message || proxyErr}`);
     }
   }
+
+  if (!res || !res.ok) {
+    throw new Error(fetchErrorMsg || 'Failed to fetch video stream');
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  console.log(`[Thumbnail Backfill] Video stream fetched successfully. Content-Type: ${contentType}`);
+
+  const blob = await res.blob();
+  console.log(`[Thumbnail Backfill] Downloaded video stream: ${blob.size} bytes (${blob.type})`);
+
+  if (blob.size === 0) {
+    throw new Error('Fetched video stream is empty (0 bytes)');
+  }
+
+  const tempFile = new File([blob], `video-${identifier}.mp4`, {
+    type: blob.type || 'video/mp4',
+  });
+
+  const thumbFile = await generateVideoThumbnail(tempFile, 30000);
+  if (!thumbFile) {
+    throw new Error('Frame extraction returned null');
+  }
+
+  console.log(`[Thumbnail Backfill] SUCCESS: Generated ${thumbFile.size} byte thumbnail for videoId: ${identifier}`);
+  return thumbFile;
 }
+
 
 

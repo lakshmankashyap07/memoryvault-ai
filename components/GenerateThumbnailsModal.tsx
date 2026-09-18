@@ -133,13 +133,21 @@ export function GenerateThumbnailsModal({
         prev.map((v) => (v.id === item.id ? { ...v, status: 'processing', progress: 10 } : v))
       );
 
+      console.log(`[Thumbnail Backfill] Processing video: ${item.id}`);
+      console.log(`[Thumbnail Backfill] Filename: ${item.name}`);
+      console.log(`[Thumbnail Backfill] Original video URL: ${item.fileUrl}`);
+
       try {
-        // 1. Generate thumbnail File from remote video URL
-        const thumbFile = await generateVideoThumbnailFromUrl(item.fileUrl, item.id);
+        // 1. Generate thumbnail File from video URL (with automatic server proxy fallback)
+        const proxyUrl = `/api/memories/${memoryId}/videos/${item.id}`;
+        console.log(`[Thumbnail Backfill] Stage 1: Fetching video & extracting frame...`);
+        const thumbFile = await generateVideoThumbnailFromUrl(item.fileUrl, item.id, proxyUrl);
+
         if (!thumbFile) {
-          throw new Error('Could not extract frame from video file.');
+          throw new Error('Frame extraction returned empty result');
         }
 
+        console.log(`[Thumbnail Backfill] Stage 2: Frame extracted successfully (${thumbFile.size} bytes). Uploading thumbnail...`);
         setItems((prev) =>
           prev.map((v) => (v.id === item.id ? { ...v, progress: 50 } : v))
         );
@@ -156,8 +164,10 @@ export function GenerateThumbnailsModal({
         });
 
         if (!newThumbnailUrl) {
-          throw new Error('Failed to upload thumbnail to storage.');
+          throw new Error('Storage returned empty thumbnail URL');
         }
+
+        console.log(`[Thumbnail Backfill] Stage 3: Thumbnail uploaded to Blob: ${newThumbnailUrl}. Updating Prisma DB...`);
 
         // 3. Update MemoryVideo record in Prisma via PATCH endpoint
         const res = await fetch(`/api/memories/${memoryId}/videos/${item.id}`, {
@@ -168,8 +178,10 @@ export function GenerateThumbnailsModal({
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to update video record in database.');
+          throw new Error(data.error || `Prisma DB update failed (HTTP ${res.status})`);
         }
+
+        console.log(`[Thumbnail Backfill] Stage 4: SUCCESS - Prisma DB record updated for videoId: ${item.id}`);
 
         // Mark success
         setItems((prev) =>
@@ -182,8 +194,8 @@ export function GenerateThumbnailsModal({
         successCount++;
         return true;
       } catch (err: any) {
-        console.error(`Error backfilling thumbnail for ${item.name}:`, err);
         const errMsg = err?.message || 'Thumbnail generation failed';
+        console.error(`[Thumbnail Backfill] FAILED for videoId ${item.id}:`, errMsg);
         setItems((prev) =>
           prev.map((v) =>
             v.id === item.id ? { ...v, status: 'failed', progress: 0, error: errMsg } : v
