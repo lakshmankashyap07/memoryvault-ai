@@ -144,6 +144,100 @@ interface MemorySpaceData {
   }>;
 }
 
+function VideoCardItem({
+  video,
+  isDownloading,
+  onSelect,
+  onDownload,
+}: {
+  video: MemorySpaceData['videos'][number];
+  isDownloading: boolean;
+  onSelect: () => void;
+  onDownload: (e: React.MouseEvent) => void;
+}) {
+  const [thumbError, setThumbError] = useState(false);
+  const fileName = video.title || video.caption || `video-${video.id.slice(0, 6)}.mp4`;
+
+  return (
+    <div
+      onClick={onSelect}
+      className="group relative bg-white rounded-2xl overflow-hidden border border-vault-200/80 shadow-xs hover:shadow-md transition-all flex flex-col cursor-pointer"
+    >
+      <div className="relative aspect-square bg-vault-950 overflow-hidden flex items-center justify-center">
+        {video.thumbnailUrl && !thumbError ? (
+          <img
+            src={video.thumbnailUrl}
+            alt={video.title || 'Video Thumbnail'}
+            loading="lazy"
+            onError={() => setThumbError(true)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-vault-900 via-vault-950 to-vault-900 flex items-center justify-center">
+            <Video className="w-8 h-8 text-amber-500/40" />
+          </div>
+        )}
+
+        {/* Center Play Indicator */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-10 h-10 rounded-full bg-vault-900/80 group-hover:bg-amber-500 text-amber-300 group-hover:text-vault-950 flex items-center justify-center shadow-lg transition-all border border-amber-500/40 group-hover:scale-110">
+            <Play className="w-4 h-4 fill-current ml-0.5" />
+          </div>
+        </div>
+
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-vault-950/90 via-vault-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-between">
+          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={onDownload}
+              disabled={isDownloading}
+              className="p-1.5 rounded-xl bg-vault-900/80 hover:bg-amber-600 text-amber-300 hover:text-vault-950 transition-colors shadow-sm"
+              title="Download video"
+            >
+              {isDownloading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+
+          <div>
+            <p className="font-serif font-semibold text-[11px] text-vault-100 line-clamp-1 leading-snug">
+              {video.title || video.caption || 'Video Memory'}
+            </p>
+            <p className="text-[9px] text-vault-300 truncate mt-0.5">
+              {video.uploadedBy}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Footer */}
+      <div className="p-2 bg-white flex items-center justify-between gap-1 text-[10px] text-vault-600 border-t border-vault-100 sm:hidden">
+        <span className="truncate font-medium">{video.title || video.caption || 'Video'}</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDownload(e);
+          }}
+          disabled={isDownloading}
+          className="p-1 rounded-lg bg-vault-100 hover:bg-amber-100 text-vault-800 shrink-0"
+          title="Download"
+        >
+          {isDownloading ? (
+            <Loader2 className="w-3 h-3 animate-spin text-amber-800" />
+          ) : (
+            <Download className="w-3 h-3 text-vault-700" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function MemoryProfilePage() {
   const params = useParams();
   const memoryId = params.memoryId as string;
@@ -898,89 +992,19 @@ export default function MemoryProfilePage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-                {space.videos.map((video) => {
-                  const isDownloading = downloadingMediaId === video.id;
-                  const fileName = video.title || video.caption || `video-${video.id.slice(0, 6)}.mp4`;
-
-                  return (
-                    <div
-                      key={video.id}
-                      onClick={() => setSelectedVideo(video)}
-                      className="group relative bg-white rounded-2xl overflow-hidden border border-vault-200/80 shadow-xs hover:shadow-md transition-all flex flex-col cursor-pointer"
-                    >
-                      <div className="relative aspect-square bg-vault-950 overflow-hidden flex items-center justify-center">
-                        {video.thumbnailUrl ? (
-                          <img
-                            src={video.thumbnailUrl}
-                            alt={video.title || 'Video Thumbnail'}
-                            loading="lazy"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-vault-900 via-vault-950 to-vault-900 flex items-center justify-center">
-                            <Video className="w-8 h-8 text-amber-500/40" />
-                          </div>
-                        )}
-
-                        {/* Center Play Indicator */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="w-10 h-10 rounded-full bg-vault-900/80 group-hover:bg-amber-500 text-amber-300 group-hover:text-vault-950 flex items-center justify-center shadow-lg transition-all border border-amber-500/40 group-hover:scale-110">
-                            <Play className="w-4 h-4 fill-current ml-0.5" />
-                          </div>
-                        </div>
-
-                        {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-vault-950/90 via-vault-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-between">
-                          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadMedia(video.fileUrl, fileName, video.id)}
-                              disabled={isDownloading}
-                              className="p-1.5 rounded-xl bg-vault-900/80 hover:bg-amber-600 text-amber-300 hover:text-vault-950 transition-colors shadow-sm"
-                              title="Download video"
-                            >
-                              {isDownloading ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Download className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          </div>
-
-                          <div>
-                            <p className="font-serif font-semibold text-[11px] text-vault-100 line-clamp-1 leading-snug">
-                              {video.title || video.caption || 'Video Memory'}
-                            </p>
-                            <p className="text-[9px] text-vault-300 truncate mt-0.5">
-                              {video.uploadedBy}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Mobile Footer */}
-                      <div className="p-2 bg-white flex items-center justify-between gap-1 text-[10px] text-vault-600 border-t border-vault-100 sm:hidden">
-                        <span className="truncate font-medium">{video.title || video.caption || 'Video'}</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadMedia(video.fileUrl, fileName, video.id);
-                          }}
-                          disabled={isDownloading}
-                          className="p-1 rounded-lg bg-vault-100 hover:bg-amber-100 text-vault-800 shrink-0"
-                          title="Download"
-                        >
-                          {isDownloading ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-amber-800" />
-                          ) : (
-                            <Download className="w-3 h-3 text-vault-700" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                {space.videos.map((video) => (
+                  <VideoCardItem
+                    key={video.id}
+                    video={video}
+                    isDownloading={downloadingMediaId === video.id}
+                    onSelect={() => setSelectedVideo(video)}
+                    onDownload={(e) => {
+                      e.stopPropagation();
+                      const fileName = video.title || video.caption || `video-${video.id.slice(0, 6)}.mp4`;
+                      handleDownloadMedia(video.fileUrl, fileName, video.id);
+                    }}
+                  />
+                ))}
               </div>
             )}
           </div>

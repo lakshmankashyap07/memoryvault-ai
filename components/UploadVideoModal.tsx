@@ -15,7 +15,7 @@ import {
   Play,
   Trash2,
 } from 'lucide-react';
-import { uploadFileWithProgress } from '@/lib/upload-helper';
+import { uploadFileWithProgress, generateVideoThumbnail } from '@/lib/upload-helper';
 
 interface UploadVideoModalProps {
   isOpen: boolean;
@@ -29,12 +29,15 @@ export interface VideoItem {
   file?: File;
   urlInput?: string;
   previewUrl: string;
+  thumbnailFile?: File | null;
+  thumbnailPreviewUrl?: string;
   name: string;
   size: number;
   status: 'idle' | 'uploading' | 'success' | 'failed';
   progress: number;
   error?: string;
   uploadedUrl?: string;
+  uploadedThumbnailUrl?: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -126,6 +129,9 @@ export function UploadVideoModal({
         if (item.file && item.previewUrl.startsWith('blob:')) {
           URL.revokeObjectURL(item.previewUrl);
         }
+        if (item.thumbnailPreviewUrl && item.thumbnailPreviewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(item.thumbnailPreviewUrl);
+        }
       });
     };
   }, []);
@@ -137,6 +143,9 @@ export function UploadVideoModal({
     selectedVideos.forEach((item) => {
       if (item.file && item.previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(item.previewUrl);
+      }
+      if (item.thumbnailPreviewUrl && item.thumbnailPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(item.thumbnailPreviewUrl);
       }
     });
     setSelectedVideos([]);
@@ -163,14 +172,30 @@ export function UploadVideoModal({
     Array.from(files).forEach((file) => {
       if (isVideoFile(file)) {
         const previewUrl = URL.createObjectURL(file);
-        newValidVideos.push({
-          id: `${file.name}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        const id = `${file.name}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const newItem: VideoItem = {
+          id,
           file,
           previewUrl,
           name: file.name,
           size: file.size,
           status: 'idle',
           progress: 0,
+        };
+        newValidVideos.push(newItem);
+
+        // Generate thumbnail preview frame asynchronously
+        generateVideoThumbnail(file).then((thumbFile) => {
+          if (thumbFile) {
+            const thumbUrl = URL.createObjectURL(thumbFile);
+            setSelectedVideos((prev) =>
+              prev.map((v) =>
+                v.id === id
+                  ? { ...v, thumbnailFile: thumbFile, thumbnailPreviewUrl: thumbUrl }
+                  : v
+              )
+            );
+          }
         });
       } else {
         invalidFileNames.push(file.name);
@@ -221,6 +246,9 @@ export function UploadVideoModal({
       const target = prev.find((v) => v.id === id);
       if (target?.file && target.previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(target.previewUrl);
+      }
+      if (target?.thumbnailPreviewUrl && target.thumbnailPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(target.thumbnailPreviewUrl);
       }
       return prev.filter((v) => v.id !== id);
     });
@@ -273,8 +301,24 @@ export function UploadVideoModal({
 
       try {
         let finalVideoUrl = item.urlInput || item.uploadedUrl || '';
+        let finalThumbnailUrl = item.uploadedThumbnailUrl || thumbnailUrl.trim() || '';
 
-        // 1. Direct browser-to-Vercel-Blob client upload (if local File)
+        // 1. Automatic Video Thumbnail Generation & Upload
+        if (item.file && !finalThumbnailUrl) {
+          try {
+            let thumbFile = item.thumbnailFile || null;
+            if (!thumbFile) {
+              thumbFile = await generateVideoThumbnail(item.file);
+            }
+            if (thumbFile) {
+              finalThumbnailUrl = await uploadFileWithProgress(thumbFile);
+            }
+          } catch (thumbErr) {
+            console.warn(`Automatic video thumbnail generation skipped for ${item.name}:`, thumbErr);
+          }
+        }
+
+        // 2. Direct browser-to-Vercel-Blob client upload (for original video file)
         if (item.file && !item.uploadedUrl) {
           finalVideoUrl = await uploadFileWithProgress(item.file, {
             onProgress: (pct) => {
@@ -289,13 +333,13 @@ export function UploadVideoModal({
           throw new Error('Could not obtain valid video URL for storage.');
         }
 
-        // 2. Save MemoryVideo metadata record in Prisma
+        // 3. Save MemoryVideo metadata record in Prisma
         const res = await fetch(`/api/memories/${memoryId}/videos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fileUrl: finalVideoUrl,
-            thumbnailUrl: thumbnailUrl.trim() || null,
+            thumbnailUrl: finalThumbnailUrl || null,
             title: title.trim() || item.name,
             caption: caption.trim() || null,
             date: date || null,
@@ -312,7 +356,13 @@ export function UploadVideoModal({
         setSelectedVideos((prev) =>
           prev.map((v) =>
             v.id === item.id
-              ? { ...v, status: 'success', progress: 100, uploadedUrl: finalVideoUrl }
+              ? {
+                  ...v,
+                  status: 'success',
+                  progress: 100,
+                  uploadedUrl: finalVideoUrl,
+                  uploadedThumbnailUrl: finalThumbnailUrl,
+                }
               : v
           )
         );
@@ -353,6 +403,7 @@ export function UploadVideoModal({
       );
     }
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -501,8 +552,16 @@ export function UploadVideoModal({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                          <Play className="w-4 h-4 fill-amber-700 text-amber-700 ml-0.5" />
+                        <div className="w-12 h-10 rounded-lg bg-vault-900 overflow-hidden flex items-center justify-center shrink-0 border border-vault-200 relative">
+                          {video.thumbnailPreviewUrl ? (
+                            <img
+                              src={video.thumbnailPreviewUrl}
+                              alt="Thumbnail preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Play className="w-4 h-4 fill-amber-500 text-amber-500 ml-0.5" />
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-vault-900 truncate">

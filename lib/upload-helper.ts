@@ -133,3 +133,133 @@ export async function uploadFileWithProgress(
     });
   }
 }
+
+/**
+ * Automatically generates a video thumbnail image File from a browser video File.
+ * Seeks to ~1.0 second (or midpoint for short videos) and captures a JPEG blob frame via HTMLCanvasElement.
+ * Returns null if thumbnail generation is unsupported or fails, allowing upload to proceed gracefully.
+ */
+export function generateVideoThumbnail(file: File): Promise<File | null> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !file || !file.type.startsWith('video/')) {
+      resolve(null);
+      return;
+    }
+
+    let completed = false;
+    let videoUrl = '';
+
+    const cleanup = (url?: string, video?: HTMLVideoElement) => {
+      if (completed) return;
+      completed = true;
+      if (url) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
+        }
+      }
+      if (video) {
+        video.onloadedmetadata = null;
+        video.onseeked = null;
+        video.onerror = null;
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    // Safety timeout of 5 seconds
+    const timer = setTimeout(() => {
+      if (!completed) {
+        console.warn(`Thumbnail generation timed out for video: ${file.name}`);
+        cleanup(videoUrl, video);
+        resolve(null);
+      }
+    }, 5000);
+
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+
+    try {
+      videoUrl = URL.createObjectURL(file);
+    } catch (e) {
+      clearTimeout(timer);
+      console.warn(`Could not create object URL for video ${file.name}:`, e);
+      resolve(null);
+      return;
+    }
+
+    video.onerror = (e) => {
+      clearTimeout(timer);
+      console.warn(`Video load error while generating thumbnail for ${file.name}:`, e);
+      cleanup(videoUrl, video);
+      resolve(null);
+    };
+
+    video.onloadedmetadata = () => {
+      try {
+        const duration = video.duration || 0;
+        // Seek to 1s or midpoint if duration < 1s
+        const seekTime = Math.min(1.0, duration > 0.2 ? duration / 2 : 0);
+        video.currentTime = seekTime;
+      } catch (seekErr) {
+        clearTimeout(timer);
+        console.warn(`Error seeking video ${file.name}:`, seekErr);
+        cleanup(videoUrl, video);
+        resolve(null);
+      }
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const width = video.videoWidth || 640;
+        const height = video.videoHeight || 360;
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          clearTimeout(timer);
+          cleanup(videoUrl, video);
+          resolve(null);
+          return;
+        }
+
+        ctx.drawImage(video, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            clearTimeout(timer);
+            cleanup(videoUrl, video);
+            if (blob) {
+              const baseName = file.name.replace(/\.[^/.]+$/, '');
+              const thumbFileName = `${baseName}-thumb.jpg`;
+              const thumbFile = new File([blob], thumbFileName, { type: 'image/jpeg' });
+              resolve(thumbFile);
+            } else {
+              resolve(null);
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      } catch (drawErr) {
+        clearTimeout(timer);
+        console.warn(`Canvas export error for thumbnail ${file.name}:`, drawErr);
+        cleanup(videoUrl, video);
+        resolve(null);
+      }
+    };
+
+    video.src = videoUrl;
+  });
+}
+
