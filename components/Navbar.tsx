@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Sparkles, Heart, PlusCircle, LogOut, User, LayoutDashboard, Shield, Menu, X } from 'lucide-react';
+import { Sparkles, Heart, PlusCircle, LogOut, User, LayoutDashboard, Shield, Menu, X, Bell } from 'lucide-react';
+import { InvitationsModal } from '@/components/InvitationsModal';
 
 interface AuthUser {
   id: string;
@@ -18,16 +19,33 @@ export function Navbar() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [invitationsCount, setInvitationsCount] = useState(0);
+  const [invitationsModalOpen, setInvitationsModalOpen] = useState(false);
+
+  const fetchInvitationsCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/user/invitations');
+      const data = await res.json();
+      if (res.ok && data.invitations) {
+        setInvitationsCount(data.invitations.length);
+      }
+    } catch {
+      // Ignore background fetch error
+    }
+  }, []);
 
   useEffect(() => {
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => {
-        if (data.user) setUser(data.user);
+        if (data.user) {
+          setUser(data.user);
+          fetchInvitationsCount();
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [pathname]);
+  }, [pathname, fetchInvitationsCount]);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -82,6 +100,20 @@ export function Navbar() {
             <>
               {user ? (
                 <div className="flex items-center gap-3 pl-4 border-l border-vault-200">
+                  {/* Notification Bell Button */}
+                  <button
+                    onClick={() => setInvitationsModalOpen(true)}
+                    className="relative p-2 rounded-full text-vault-700 hover:bg-vault-100 hover:text-vault-900 transition-colors"
+                    title="Invitations"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {invitationsCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-rose-500 text-white font-bold text-[10px] flex items-center justify-center shadow-sm animate-pulse">
+                        {invitationsCount}
+                      </span>
+                    )}
+                  </button>
+
                   <Link
                     href="/create-memory"
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-vault-800 to-vault-700 hover:from-vault-900 hover:to-vault-800 text-amber-100 text-sm font-medium shadow-md shadow-vault-900/10 hover:shadow-lg transition-all"
@@ -110,6 +142,20 @@ export function Navbar() {
                         <p className="text-xs font-semibold text-vault-900 truncate">{user.name}</p>
                         <p className="text-[11px] text-vault-500 truncate">{user.email}</p>
                       </div>
+                      <button
+                        onClick={() => setInvitationsModalOpen(true)}
+                        className="w-full flex items-center justify-between px-4 py-2 text-xs text-vault-700 hover:bg-vault-50 hover:text-vault-900 text-left"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Bell className="w-3.5 h-3.5 text-vault-600" />
+                          Invitations
+                        </span>
+                        {invitationsCount > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white font-bold text-[9px]">
+                            {invitationsCount}
+                          </span>
+                        )}
+                      </button>
                       <Link
                         href="/dashboard"
                         className="flex items-center gap-2 px-4 py-2 text-xs text-vault-700 hover:bg-vault-50 hover:text-vault-900"
@@ -150,6 +196,20 @@ export function Navbar() {
 
         {/* Mobile Hamburger Menu button */}
         <div className="flex md:hidden items-center gap-2">
+          {user && (
+            <button
+              onClick={() => setInvitationsModalOpen(true)}
+              className="relative p-2 rounded-lg text-vault-700 hover:bg-vault-100 transition-colors"
+              title="Invitations"
+            >
+              <Bell className="w-5 h-5" />
+              {invitationsCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-bold text-[9px] flex items-center justify-center animate-pulse">
+                  {invitationsCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg text-vault-700 hover:bg-vault-100 transition-colors"
@@ -172,6 +232,23 @@ export function Navbar() {
           </Link>
           {user ? (
             <>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setInvitationsModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between py-2 text-base font-medium text-vault-800 border-b border-vault-100 text-left"
+              >
+                <span className="flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-vault-600" />
+                  Invitations
+                </span>
+                {invitationsCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-bold text-xs">
+                    {invitationsCount} pending
+                  </span>
+                )}
+              </button>
               <Link
                 href="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}
@@ -218,6 +295,13 @@ export function Navbar() {
           )}
         </div>
       )}
+
+      {/* Invitations Modal */}
+      <InvitationsModal
+        isOpen={invitationsModalOpen}
+        onClose={() => setInvitationsModalOpen(false)}
+        onInvitationProcessed={fetchInvitationsCount}
+      />
     </header>
   );
 }

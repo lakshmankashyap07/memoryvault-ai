@@ -20,10 +20,12 @@ import {
   Sparkles,
   Loader2,
   BookOpen,
+  Mail,
 } from 'lucide-react';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { ShareModal } from '@/components/ShareModal';
 import { AISearchBar } from '@/components/AISearchBar';
+import { InvitationsModal } from '@/components/InvitationsModal';
 
 interface MemorySpaceItem {
   id: string;
@@ -61,6 +63,34 @@ export default function DashboardPage() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
+  // User Pending Invitations State
+  const [pendingInvitationsCount, setPendingInvitationsCount] = useState(0);
+  const [invitationsModalOpen, setInvitationsModalOpen] = useState(false);
+
+  const fetchUserInvitations = async () => {
+    try {
+      const res = await fetch('/api/user/invitations');
+      const data = await res.json();
+      if (res.ok && data.invitations) {
+        setPendingInvitationsCount(data.invitations.length);
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard invitations:', err);
+    }
+  };
+
+  const fetchMemories = async () => {
+    try {
+      const res = await fetch('/api/memories');
+      const data = await res.json();
+      if (data?.spaces) {
+        setSpaces(data.spaces);
+      }
+    } catch (err) {
+      console.error('Dashboard memories fetch error:', err);
+    }
+  };
+
   useEffect(() => {
     fetch('/api/auth/me')
       .then((res) => res.json())
@@ -69,18 +99,18 @@ export default function DashboardPage() {
           router.push('/login');
         } else {
           setUser(data.user);
-          return fetch('/api/memories');
-        }
-      })
-      .then((res) => res?.json())
-      .then((data) => {
-        if (data?.spaces) {
-          setSpaces(data.spaces);
+          fetchUserInvitations();
+          return fetchMemories();
         }
       })
       .catch((err) => console.error('Dashboard fetch error:', err))
       .finally(() => setLoading(false));
   }, [router]);
+
+  const handleInvitationProcessed = () => {
+    fetchUserInvitations();
+    fetchMemories();
+  };
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -111,6 +141,32 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      {/* Pending Invitations Banner Card */}
+      {pendingInvitationsCount > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-amber-100/70 to-amber-50 border border-amber-300 rounded-3xl p-5 shadow-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fadeIn">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <Mail className="w-5.5 h-5.5 text-amber-800" />
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-base text-amber-950">
+                You have {pendingInvitationsCount} pending Memory Space invitation{pendingInvitationsCount > 1 ? 's' : ''}!
+              </h3>
+              <p className="text-xs text-amber-800">
+                Accept to gain immediate access and start preserving memories together.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setInvitationsModalOpen(true)}
+            className="px-5 py-2.5 rounded-full bg-vault-900 hover:bg-vault-950 text-amber-100 font-semibold text-xs transition-colors shrink-0 shadow-md flex items-center gap-1.5"
+          >
+            <span>View & Respond ({pendingInvitationsCount})</span>
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-vault-900 via-vault-950 to-vault-900 rounded-3xl p-8 sm:p-10 text-vault-100 shadow-elevated relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="space-y-2 max-w-xl">
@@ -353,6 +409,12 @@ export default function DashboardPage() {
           personName={selectedSpace.personName}
         />
       )}
+
+      <InvitationsModal
+        isOpen={invitationsModalOpen}
+        onClose={() => setInvitationsModalOpen(false)}
+        onInvitationProcessed={handleInvitationProcessed}
+      />
     </div>
   );
 }
